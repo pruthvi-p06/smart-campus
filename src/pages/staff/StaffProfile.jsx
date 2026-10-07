@@ -1,22 +1,110 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import StaffSidebar from "../../components/StaffSidebar";
+import { getProfile, updateProfile } from "../../services/api";
 
 function StaffProfile() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [department, setDepartment] = useState("");
 
-  const [name, setName] = useState("Staff Name");
-  const [email, setEmail] = useState("staff@example.com");
-  const [phone, setPhone] = useState("9876543210");
-  const [department, setDepartment] = useState("Network");
-
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await getProfile();
+
+        const profile =
+          response.profile ||
+          response.user ||
+          response.data ||
+          response;
+
+        setName(profile.name || "");
+        setEmail(profile.email || "");
+        setPhone(profile.phone || "");
+        setDepartment(profile.department || "");
+      } catch (err) {
+        setError(
+          err.message || "Failed to load profile."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    setSuccessMessage("Profile updated successfully!");
+    try {
+      setSaving(true);
+      setError("");
+      setSuccessMessage("");
+
+      const response = await updateProfile({
+        name,
+        email,
+        phone,
+        department
+      });
+
+      const updatedProfile =
+        response.profile ||
+        response.user ||
+        response.data ||
+        response;
+
+      setName(updatedProfile.name || name);
+      setEmail(updatedProfile.email || email);
+      setPhone(updatedProfile.phone || phone);
+      setDepartment(
+        updatedProfile.department || department
+      );
+
+      setSuccessMessage(
+        "Profile updated successfully!"
+      );
+    } catch (err) {
+      setError(
+        err.message || "Failed to update profile."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
+  if (loading) {
+    return (
+      <div className="dashboard-layout">
+
+        <StaffSidebar />
+
+        <main className="main-content">
+
+          <div className="page-content">
+
+            <div className="no-issues">
+              <h2>Loading profile...</h2>
+            </div>
+
+          </div>
+
+        </main>
+
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-layout">
@@ -63,6 +151,15 @@ function StaffProfile() {
           </div>
 
 
+          {error && (
+
+            <div className="error-message">
+              ⚠ {error}
+            </div>
+
+          )}
+
+
           <div className="staff-profile-grid">
 
             {/* LEFT PROFILE CARD */}
@@ -70,12 +167,16 @@ function StaffProfile() {
             <section className="profile-summary-card">
 
               <div className="profile-avatar">
-                {name.charAt(0).toUpperCase()}
+                {(name || "S").charAt(0).toUpperCase()}
               </div>
 
-              <h2>{name}</h2>
+              <h2>
+                {name || "Staff"}
+              </h2>
 
-              <p>{email}</p>
+              <p>
+                {email || "—"}
+              </p>
 
               <span className="profile-role">
                 Staff
@@ -170,6 +271,10 @@ function StaffProfile() {
                       }}
                     >
 
+                      <option value="">
+                        Select Department
+                      </option>
+
                       <option value="Network">
                         Network
                       </option>
@@ -214,6 +319,19 @@ function StaffProfile() {
                 </div>
 
 
+                {/* Error */}
+
+                {error && (
+
+                  <div className="error-message">
+
+                    ⚠ {error}
+
+                  </div>
+
+                )}
+
+
                 {/* Success Message */}
 
                 {successMessage && (
@@ -232,8 +350,11 @@ function StaffProfile() {
                 <button
                   type="submit"
                   className="save-profile-button"
+                  disabled={saving}
                 >
-                  Save Changes
+                  {saving
+                    ? "Saving..."
+                    : "Save Changes"}
                 </button>
 
               </form>

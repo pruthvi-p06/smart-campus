@@ -1,79 +1,69 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
+import { getResources } from "../../services/api";
 
 function Resources() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const resources = [
-    {
-      id: 1,
-      name: "Central Library",
-      category: "Academic",
-      location: "Main Block",
-      availability: "Open",
-      description:
-        "Library with textbooks, reference materials and study spaces."
-    },
-    {
-      id: 2,
-      name: "Computer Lab 3",
-      category: "Laboratory",
-      location: "Block A",
-      availability: "Available",
-      description:
-        "Computer laboratory available for academic and project work."
-    },
-    {
-      id: 3,
-      name: "Seminar Hall",
-      category: "Facility",
-      location: "Block B",
-      availability: "Available",
-      description:
-        "Large hall for seminars, presentations and academic events."
-    },
-    {
-      id: 4,
-      name: "Medical Centre",
-      category: "Health",
-      location: "Main Block",
-      availability: "Open",
-      description:
-        "Campus medical facility for basic medical assistance."
-    },
-    {
-      id: 5,
-      name: "Sports Complex",
-      category: "Sports",
-      location: "Campus Ground",
-      availability: "Available",
-      description:
-        "Facilities for indoor and outdoor sports activities."
-    },
-    {
-      id: 6,
-      name: "Project Discussion Room",
-      category: "Facility",
-      location: "Block A",
-      availability: "Occupied",
-      description:
-        "Small discussion room for student project meetings."
-    }
-  ];
+  useEffect(() => {
+    const fetchResources = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await getResources();
+
+        const resourceList =
+          response.resources ||
+          response.data ||
+          response ||
+          [];
+
+        setResources(
+          Array.isArray(resourceList) ? resourceList : []
+        );
+      } catch (err) {
+        setError(
+          err.message || "Failed to load resources."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchResources();
+  }, []);
 
   const filteredResources = resources.filter((resource) => {
+    const name = resource.name || "";
+    const category = resource.category || "";
+    const location = resource.location || "";
+
     const matchesSearch =
-      resource.name.toLowerCase().includes(search.toLowerCase()) ||
-      resource.category.toLowerCase().includes(search.toLowerCase()) ||
-      resource.location.toLowerCase().includes(search.toLowerCase());
+      name.toLowerCase().includes(search.toLowerCase()) ||
+      category.toLowerCase().includes(search.toLowerCase()) ||
+      location.toLowerCase().includes(search.toLowerCase());
 
     const matchesCategory =
       categoryFilter === "All" ||
-      resource.category === categoryFilter;
+      category === categoryFilter;
 
     return matchesSearch && matchesCategory;
   });
+
+  const getResourceIcon = (category) => {
+    if (category === "Academic") return "📚";
+    if (category === "Laboratory") return "💻";
+    if (category === "Facility") return "🏢";
+    if (category === "Health") return "🏥";
+    if (category === "Sports") return "🏟️";
+
+    return "🏫";
+  };
 
   return (
     <DashboardLayout>
@@ -92,7 +82,6 @@ function Resources() {
 
       </div>
 
-
       {/* Filters */}
 
       <div className="resource-filters">
@@ -110,7 +99,6 @@ function Resources() {
 
         </div>
 
-
         <div className="status-filter">
 
           <label htmlFor="resource-category">
@@ -120,7 +108,9 @@ function Resources() {
           <select
             id="resource-category"
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(e) =>
+              setCategoryFilter(e.target.value)
+            }
           >
 
             <option value="All">All</option>
@@ -136,86 +126,102 @@ function Resources() {
 
       </div>
 
+      {error && (
+        <div className="error-message">
+          ⚠ {error}
+        </div>
+      )}
 
       {/* Count */}
 
-      <div className="issue-count">
-        Showing {filteredResources.length} of {resources.length} resources
-      </div>
-
+      {!loading && (
+        <div className="issue-count">
+          Showing {filteredResources.length} of{" "}
+          {resources.length} resources
+        </div>
+      )}
 
       {/* Resource Cards */}
 
-      <div className="resources-grid">
+      {loading ? (
 
-        {filteredResources.length > 0 ? (
+        <div className="no-issues">
+          <h2>Loading resources...</h2>
+        </div>
 
-          filteredResources.map((resource) => (
+      ) : (
 
-            <div
-              className="resource-card"
-              key={resource.id}
-            >
+        <div className="resources-grid">
 
-              <div className="resource-card-header">
+          {filteredResources.length > 0 ? (
 
-                <div className="resource-icon">
-                  {resource.category === "Academic" && "📚"}
-                  {resource.category === "Laboratory" && "💻"}
-                  {resource.category === "Facility" && "🏢"}
-                  {resource.category === "Health" && "🏥"}
-                  {resource.category === "Sports" && "🏟️"}
+            filteredResources.map((resource) => (
+
+              <div
+                className="resource-card"
+                key={resource._id || resource.id}
+              >
+
+                <div className="resource-card-header">
+
+                  <div className="resource-icon">
+                    {getResourceIcon(resource.category)}
+                  </div>
+
+                  <span
+                    className={`availability ${
+                      (resource.availability || "")
+                        .toLowerCase()
+                        .replace(" ", "-")
+                    }`}
+                  >
+                    {resource.availability || "Available"}
+                  </span>
+
                 </div>
 
-                <span
-                  className={`availability ${resource.availability
-                    .toLowerCase()
-                    .replace(" ", "-")}`}
-                >
-                  {resource.availability}
-                </span>
+                <h2>
+                  {resource.name || "Unnamed Resource"}
+                </h2>
+
+                <p className="resource-description">
+                  {resource.description ||
+                    "No description available."}
+                </p>
+
+                <div className="resource-meta">
+
+                  <span>
+                    📁 {resource.category || "—"}
+                  </span>
+
+                  <span>
+                    📍 {resource.location || "—"}
+                  </span>
+
+                </div>
 
               </div>
 
+            ))
 
-              <h2>{resource.name}</h2>
+          ) : (
 
-              <p className="resource-description">
-                {resource.description}
+            <div className="no-issues">
+              <div className="no-issues-icon">🔍</div>
+
+              <h2>No resources found</h2>
+
+              <p>
+                Try changing your search or category filter.
               </p>
-
-
-              <div className="resource-meta">
-
-                <span>
-                  📁 {resource.category}
-                </span>
-
-                <span>
-                  📍 {resource.location}
-                </span>
-
-              </div>
-
             </div>
 
-          ))
+          )}
 
-        ) : (
+        </div>
 
-          <div className="no-issues">
-            <div className="no-issues-icon">🔍</div>
-
-            <h2>No resources found</h2>
-
-            <p>
-              Try changing your search or category filter.
-            </p>
-          </div>
-
-        )}
-
-      </div>
+      )}
 
     </DashboardLayout>
   );

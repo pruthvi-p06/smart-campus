@@ -1,34 +1,114 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
+import { getProfile, updateProfile } from "../../services/api";
 
 function Profile() {
   const [profile, setProfile] = useState({
-    name: "Student Name",
-    email: "student@example.com",
+    name: "",
+    email: "",
     phone: "",
-    department: "CSE-AIML",
-    year: "2nd Year",
+    department: "",
+    year: "",
     role: "Student"
   });
 
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await getProfile();
+
+        const data =
+          response.profile ||
+          response.user ||
+          response.data ||
+          response;
+
+        setProfile({
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          department: data.department || "",
+          year: data.year || "",
+          role: data.role || "Student"
+        });
+      } catch (err) {
+        setError(err.message || "Failed to load profile.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    setProfile({
-      ...profile,
+    setProfile((prev) => ({
+      ...prev,
       [name]: value
-    });
+    }));
 
     setSuccess("");
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    setSuccess("Profile updated successfully!");
+    try {
+      setSaving(true);
+      setError("");
+      setSuccess("");
+
+      const response = await updateProfile({
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        department: profile.department,
+        year: profile.year
+      });
+
+      const data =
+        response.profile ||
+        response.user ||
+        response.data ||
+        response;
+
+      setProfile((prev) => ({
+        ...prev,
+        name: data.name ?? prev.name,
+        email: data.email ?? prev.email,
+        phone: data.phone ?? prev.phone,
+        department: data.department ?? prev.department,
+        year: data.year ?? prev.year,
+        role: data.role || prev.role
+      }));
+
+      setSuccess("Profile updated successfully!");
+    } catch (err) {
+      setError(err.message || "Failed to update profile.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="no-issues">
+          <h2>Loading profile...</h2>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -43,6 +123,11 @@ function Profile() {
         </div>
       </div>
 
+      {error && (
+        <div className="error-message">
+          ⚠ {error}
+        </div>
+      )}
 
       <div className="profile-container">
 
@@ -51,19 +136,18 @@ function Profile() {
         <div className="profile-summary">
 
           <div className="profile-avatar">
-            {profile.name.charAt(0).toUpperCase()}
+            {(profile.name || "S").charAt(0).toUpperCase()}
           </div>
 
-          <h2>{profile.name}</h2>
+          <h2>{profile.name || "Student"}</h2>
 
-          <p>{profile.email}</p>
+          <p>{profile.email || "—"}</p>
 
           <span className="profile-role">
             {profile.role}
           </span>
 
         </div>
-
 
         {/* Profile Form */}
 
@@ -93,7 +177,6 @@ function Profile() {
 
               </div>
 
-
               {/* Email */}
 
               <div className="form-group">
@@ -111,7 +194,6 @@ function Profile() {
                 />
 
               </div>
-
 
               {/* Phone */}
 
@@ -132,7 +214,6 @@ function Profile() {
 
               </div>
 
-
               {/* Department */}
 
               <div className="form-group">
@@ -147,6 +228,10 @@ function Profile() {
                   value={profile.department}
                   onChange={handleChange}
                 >
+
+                  <option value="">
+                    Select Department
+                  </option>
 
                   <option value="CSE-AIML">
                     CSE-AIML
@@ -172,7 +257,6 @@ function Profile() {
 
               </div>
 
-
               {/* Year */}
 
               <div className="form-group">
@@ -187,6 +271,10 @@ function Profile() {
                   value={profile.year}
                   onChange={handleChange}
                 >
+
+                  <option value="">
+                    Select Year
+                  </option>
 
                   <option value="1st Year">
                     1st Year
@@ -208,7 +296,6 @@ function Profile() {
 
               </div>
 
-
               {/* Role */}
 
               <div className="form-group">
@@ -228,6 +315,11 @@ function Profile() {
 
             </div>
 
+            {error && (
+              <div className="error-message">
+                ⚠ {error}
+              </div>
+            )}
 
             {success && (
               <div className="success-message">
@@ -235,12 +327,12 @@ function Profile() {
               </div>
             )}
 
-
             <button
               type="submit"
               className="primary-button"
+              disabled={saving}
             >
-              Save Changes
+              {saving ? "Saving..." : "Save Changes"}
             </button>
 
           </form>

@@ -1,11 +1,31 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Link,
   NavLink,
   useNavigate,
   useParams
 } from "react-router-dom";
+import {
+  getAdminIssues,
+  getAdminIssue,
+  updateAdminIssue,
 
+  getAdminUsers,
+  createAdminUser,
+  updateAdminUser,
+  updateAdminUserStatus,
+
+  getResources,
+  createResource,
+  updateResource,
+  deleteResource,
+
+  getAnalytics,
+  generateInsights,
+
+  getProfile,
+  updateProfile,
+} from "../../services/api";
 import {
   PieChart,
   Pie,
@@ -25,155 +45,90 @@ import {
    ADMIN SIDEBAR
 ========================================================= */
 
-function AdminSidebar() {
+function AdminIssues() {
+  const [issues, setIssues] = useState([]);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
 
-  return (
-    <aside className="sidebar">
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-      <h2 className="sidebar-logo">
-        SmartCampus
-      </h2>
+  useEffect(() => {
+    const fetchIssues = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-      <nav className="sidebar-nav">
+        const response = await getAdminIssues();
 
-        <NavLink to="/admin/dashboard">
-          Dashboard
-        </NavLink>
+        const issueList =
+          response.issues ||
+          response.data ||
+          response ||
+          [];
 
-        <NavLink to="/admin/issues">
-          All Issues
-        </NavLink>
+        setIssues(
+          Array.isArray(issueList) ? issueList : []
+        );
+      } catch (err) {
+        setError(
+          err.message || "Failed to load issues."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
 
-        <NavLink to="/admin/users">
-          Users
-        </NavLink>
+    fetchIssues();
+  }, []);
 
-        <NavLink to="/admin/resources">
-          Resources
-        </NavLink>
+  const formatStatus = (status) => {
+    if (!status) return "Pending";
 
-        <NavLink to="/admin/analytics">
-          Analytics
-        </NavLink>
+    return status
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
 
-      </nav>
+  const filteredIssues = issues.filter((issue) => {
+    const searchText = search.toLowerCase();
 
-      <nav className="sidebar-bottom">
+    const matchesSearch =
+      (issue.title || "").toLowerCase().includes(searchText) ||
+      (issue.category || "").toLowerCase().includes(searchText) ||
+      (issue.location || "").toLowerCase().includes(searchText);
 
-        <NavLink to="/admin/profile">
-          Profile
-        </NavLink>
+    const matchesStatus =
+      statusFilter === "All" ||
+      formatStatus(issue.status) === statusFilter;
 
-        <NavLink to="/login">
-          Logout
-        </NavLink>
+    const matchesPriority =
+      priorityFilter === "All" ||
+      (issue.priority || "").toLowerCase() ===
+        priorityFilter.toLowerCase();
 
-      </nav>
+    const matchesCategory =
+      categoryFilter === "All" ||
+      (issue.category || "").toLowerCase() ===
+        categoryFilter.toLowerCase();
 
-    </aside>
-  );
-}
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesPriority &&
+      matchesCategory
+    );
+  });
 
-
-/* =========================================================
-   ADMIN LAYOUT
-========================================================= */
-
-function AdminLayout({ children }) {
-
-  return (
-    <div className="dashboard-layout">
-
-      <AdminSidebar />
-
-      <main className="main-content">
-
-        <header className="top-navbar">
-
-          <h2>SmartCampus</h2>
-
-          <div className="navbar-right">
-
-            <span>🔔</span>
-
-            <Link to="/admin/profile">
-              Profile
-            </Link>
-
-          </div>
-
-        </header>
-
-        {children}
-
-      </main>
-
-    </div>
-  );
-}
-
-
-/* =========================================================
-   ADMIN DASHBOARD
-========================================================= */
-
-function AdminDashboard() {
-
-  const stats = [
-    {
-      title: "Total Issues",
-      value: 24
-    },
-    {
-      title: "Pending",
-      value: 7
-    },
-    {
-      title: "In Progress",
-      value: 6
-    },
-    {
-      title: "Resolved",
-      value: 11
-    }
+  const categories = [
+    ...new Set(
+      issues
+        .map((issue) => issue.category)
+        .filter(Boolean)
+    ),
   ];
-
-
-  const recentIssues = [
-    {
-      id: 1,
-      issue: "WiFi not working",
-      category: "Network",
-      location: "Lab 3",
-      priority: "High",
-      status: "Pending"
-    },
-    {
-      id: 2,
-      issue: "Broken Fan",
-      category: "Electrical",
-      location: "Block A",
-      priority: "Medium",
-      status: "In Progress"
-    },
-    {
-      id: 3,
-      issue: "Projector problem",
-      category: "Classroom",
-      location: "Room 205",
-      priority: "Low",
-      status: "Resolved"
-    },
-    {
-      id: 4,
-      issue: "Water leakage",
-      category: "Plumbing",
-      location: "Block B",
-      priority: "High",
-      status: "Pending"
-    }
-  ];
-
 
   return (
     <AdminLayout>
@@ -182,174 +137,91 @@ function AdminDashboard() {
 
         <div className="admin-dashboard-header">
 
-          <h1>
-            Admin Dashboard
-          </h1>
+          <h1>Manage Issues</h1>
 
           <p>
-            Monitor and manage campus issues, users and resources.
+            View, assign and manage all reported campus issues.
           </p>
 
         </div>
 
+        {/* FILTERS */}
 
-        {/* STATISTICS */}
+        <div className="filters-card">
 
-        <div className="stats-grid">
+          <input
+            type="text"
+            placeholder="Search issues..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
 
-          {stats.map((stat) => (
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value)
+            }
+          >
+            <option value="All">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
 
-            <div
-              className="stat-card"
-              key={stat.title}
-            >
+          <select
+            value={priorityFilter}
+            onChange={(e) =>
+              setPriorityFilter(e.target.value)
+            }
+          >
+            <option value="All">All Priority</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
 
-              <span>
-                {stat.title}
-              </span>
+          <select
+            value={categoryFilter}
+            onChange={(e) =>
+              setCategoryFilter(e.target.value)
+            }
+          >
+            <option value="All">All Categories</option>
 
-              <strong>
-                {stat.value}
-              </strong>
-
-            </div>
-
-          ))}
+            {categories.map((category) => (
+              <option
+                key={category}
+                value={category}
+              >
+                {category}
+              </option>
+            ))}
+          </select>
 
         </div>
 
+        {error && (
+          <div className="error-message">
+            ⚠ {error}
+          </div>
+        )}
 
-        {/* QUICK ACTIONS */}
+        {loading ? (
 
-        <section className="admin-section">
-
-          <div className="section-heading">
-
-            <h2>
-              Quick Actions
-            </h2>
-
+          <div className="no-issues">
+            <h2>Loading issues...</h2>
           </div>
 
+        ) : filteredIssues.length === 0 ? (
 
-          <div className="quick-actions">
-
-            <Link
-              to="/admin/issues"
-              className="quick-action-card"
-            >
-
-              <span className="quick-action-icon">
-                📋
-              </span>
-
-              <div>
-
-                <h3>
-                  Manage Issues
-                </h3>
-
-                <p>
-                  View, assign and update campus issues.
-                </p>
-
-              </div>
-
-            </Link>
-
-
-            <Link
-              to="/admin/users"
-              className="quick-action-card"
-            >
-
-              <span className="quick-action-icon">
-                👥
-              </span>
-
-              <div>
-
-                <h3>
-                  Manage Users
-                </h3>
-
-                <p>
-                  Manage students and staff accounts.
-                </p>
-
-              </div>
-
-            </Link>
-
-
-            <Link
-              to="/admin/resources"
-              className="quick-action-card"
-            >
-
-              <span className="quick-action-icon">
-                🏫
-              </span>
-
-              <div>
-
-                <h3>
-                  Manage Resources
-                </h3>
-
-                <p>
-                  Add and manage campus facilities.
-                </p>
-
-              </div>
-
-            </Link>
-
-
-            <Link
-              to="/admin/analytics"
-              className="quick-action-card"
-            >
-
-              <span className="quick-action-icon">
-                📊
-              </span>
-
-              <div>
-
-                <h3>
-                  View Analytics
-                </h3>
-
-                <p>
-                  Analyze campus issue trends and insights.
-                </p>
-
-              </div>
-
-            </Link>
-
+          <div className="no-issues">
+            <h2>No issues found</h2>
+            <p>
+              No issues match the selected filters.
+            </p>
           </div>
 
-        </section>
-
-
-        {/* RECENT ISSUES */}
-
-        <section className="admin-section">
-
-          <div className="section-heading">
-
-            <h2>
-              Recent Issues
-            </h2>
-
-            <Link to="/admin/issues">
-              View All
-            </Link>
-
-          </div>
-
+        ) : (
 
           <div className="table-card">
 
@@ -363,6 +235,7 @@ function AdminDashboard() {
                   <th>Location</th>
                   <th>Priority</th>
                   <th>Status</th>
+                  <th>Reported</th>
                   <th>Action</th>
                 </tr>
 
@@ -370,54 +243,65 @@ function AdminDashboard() {
 
               <tbody>
 
-                {recentIssues.map((issue) => (
+                {filteredIssues.map((issue) => {
 
-                  <tr key={issue.id}>
+                  const issueId =
+                    issue._id || issue.id;
 
-                    <td>
-                      <strong>
-                        {issue.issue}
-                      </strong>
-                    </td>
+                  return (
+                    <tr key={issueId}>
 
-                    <td>
-                      {issue.category}
-                    </td>
+                      <td>
+                        <strong>
+                          {issue.title || "Untitled Issue"}
+                        </strong>
+                      </td>
 
-                    <td>
-                      {issue.location}
-                    </td>
+                      <td>
+                        {issue.category || "—"}
+                      </td>
 
-                    <td>
-                      <span
-                        className={`priority-${issue.priority.toLowerCase()}`}
-                      >
-                        {issue.priority}
-                      </span>
-                    </td>
+                      <td>
+                        {issue.location || "—"}
+                      </td>
 
-                    <td>
-                      <span
-                        className={`status ${issue.status
-                          .toLowerCase()
-                          .replace(" ", "-")}`}
-                      >
-                        {issue.status}
-                      </span>
-                    </td>
+                      <td>
+                        <span
+                          className={`priority-${(
+                            issue.priority || "Low"
+                          ).toLowerCase()}`}
+                        >
+                          {issue.priority || "Low"}
+                        </span>
+                      </td>
 
-                    <td>
-                      <Link
-                        to={`/admin/issues/${issue.id}`}
-                        className="view-link"
-                      >
-                        View
-                      </Link>
-                    </td>
+                      <td>
+                        <span className="status">
+                          {formatStatus(issue.status)}
+                        </span>
+                      </td>
 
-                  </tr>
+                      <td>
+                        {issue.createdAt
+                          ? new Date(
+                              issue.createdAt
+                            ).toLocaleDateString()
+                          : issue.date || "—"}
+                      </td>
 
-                ))}
+                      <td>
+                        <Link
+                          to={`/admin/issues/${issueId}`}
+                          className="view-link"
+                        >
+                          View
+                        </Link>
+                      </td>
+
+                    </tr>
+                  );
+
+                })}
 
               </tbody>
 
@@ -425,325 +309,136 @@ function AdminDashboard() {
 
           </div>
 
-        </section>
+        )}
 
       </div>
 
     </AdminLayout>
   );
 }
-
-
-/* =========================================================
-   ALL ISSUES
-========================================================= */
-
-function AdminIssues() {
-
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("All");
-  const [priority, setPriority] = useState("All");
-  const [category, setCategory] = useState("All");
-
-
-  const issues = [
-    {
-      id: 1,
-      title: "WiFi not working",
-      category: "Network",
-      location: "Lab 3",
-      priority: "High",
-      status: "Pending",
-      department: "CSE-AIML"
-    },
-    {
-      id: 2,
-      title: "Broken Fan",
-      category: "Electrical",
-      location: "Block A",
-      priority: "Medium",
-      status: "In Progress",
-      department: "ECE"
-    },
-    {
-      id: 3,
-      title: "Projector problem",
-      category: "Classroom",
-      location: "Room 205",
-      priority: "Low",
-      status: "Resolved",
-      department: "CSE-AIML"
-    },
-    {
-      id: 4,
-      title: "Water leakage",
-      category: "Plumbing",
-      location: "Block B",
-      priority: "High",
-      status: "Pending",
-      department: "Civil"
-    },
-    {
-      id: 5,
-      title: "AC not working",
-      category: "Electrical",
-      location: "Room 302",
-      priority: "High",
-      status: "In Progress",
-      department: "ISE"
-    },
-    {
-      id: 6,
-      title: "Lights not working",
-      category: "Electrical",
-      location: "Lab 2",
-      priority: "Medium",
-      status: "Resolved",
-      department: "CSE-AIML"
-    },
-    {
-      id: 7,
-      title: "Broken classroom chair",
-      category: "Furniture",
-      location: "Room 105",
-      priority: "Low",
-      status: "Pending",
-      department: "CSE"
-    },
-    {
-      id: 8,
-      title: "Network connection issue",
-      category: "Network",
-      location: "Library",
-      priority: "High",
-      status: "In Progress",
-      department: "CSE-AIML"
-    }
-  ];
-
-
-  const filteredIssues = issues.filter((issue) => {
-
-    const text = search.toLowerCase();
-
-    const matchesSearch =
-      issue.title.toLowerCase().includes(text) ||
-      issue.category.toLowerCase().includes(text) ||
-      issue.location.toLowerCase().includes(text);
-
-    const matchesStatus =
-      status === "All" ||
-      issue.status === status;
-
-    const matchesPriority =
-      priority === "All" ||
-      issue.priority === priority;
-
-    const matchesCategory =
-      category === "All" ||
-      issue.category === category;
-
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesPriority &&
-      matchesCategory
-    );
-
-  });
-
-
-  return (
-    <AdminLayout>
-
-      <div className="page-content">
-
-        <div className="page-header">
-
-          <div>
-
-            <h1>
-              All Issues
-            </h1>
-
-            <p>
-              View and manage all reported campus issues.
-            </p>
-
-          </div>
-
-        </div>
-
-
-        {/* FILTERS */}
-
-        <div className="admin-filter-box">
-
-          <input
-            type="text"
-            placeholder="🔍 Search issues..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-
-
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-          >
-
-            <option>All</option>
-            <option>Pending</option>
-            <option>In Progress</option>
-            <option>Resolved</option>
-
-          </select>
-
-
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-          >
-
-            <option>All</option>
-            <option>High</option>
-            <option>Medium</option>
-            <option>Low</option>
-
-          </select>
-
-
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-
-            <option>All</option>
-            <option>Network</option>
-            <option>Electrical</option>
-            <option>Classroom</option>
-            <option>Plumbing</option>
-            <option>Furniture</option>
-
-          </select>
-
-        </div>
-
-
-        <p className="resource-count">
-          Showing {filteredIssues.length} of {issues.length} issues
-        </p>
-
-
-        {/* ISSUE TABLE */}
-
-        <div className="table-card">
-
-          <table>
-
-            <thead>
-
-              <tr>
-                <th>Issue</th>
-                <th>Category</th>
-                <th>Location</th>
-                <th>Department</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-
-            </thead>
-
-            <tbody>
-
-              {filteredIssues.map((issue) => (
-
-                <tr key={issue.id}>
-
-                  <td>
-                    <strong>
-                      {issue.title}
-                    </strong>
-                  </td>
-
-                  <td>
-                    {issue.category}
-                  </td>
-
-                  <td>
-                    {issue.location}
-                  </td>
-
-                  <td>
-                    {issue.department}
-                  </td>
-
-                  <td>
-                    <span
-                      className={`priority-${issue.priority.toLowerCase()}`}
-                    >
-                      {issue.priority}
-                    </span>
-                  </td>
-
-                  <td>
-                    <span
-                      className={`status ${issue.status
-                        .toLowerCase()
-                        .replace(" ", "-")}`}
-                    >
-                      {issue.status}
-                    </span>
-                  </td>
-
-                  <td>
-                    <Link
-                      to={`/admin/issues/${issue.id}`}
-                      className="view-link"
-                    >
-                      View Details
-                    </Link>
-                  </td>
-
-                </tr>
-
-              ))}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </div>
-
-    </AdminLayout>
-  );
-}
-
 
 /* =========================================================
    ISSUE DETAILS
 ========================================================= */
 
 function AdminIssueDetails() {
-
   const { id } = useParams();
 
+  const [issue, setIssue] = useState(null);
   const [status, setStatus] = useState("Pending");
-  const [staff, setStaff] = useState("Campus Network Staff");
+  const [staff, setStaff] = useState("");
+  const [adminNote, setAdminNote] = useState("");
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    const fetchIssue = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-  const handleUpdate = (e) => {
+        const response = await getAdminIssue(id);
 
+        const issueData =
+          response.issue ||
+          response.data ||
+          response;
+
+        setIssue(issueData);
+
+        setStatus(
+          issueData.status
+            ? issueData.status
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (char) =>
+                  char.toUpperCase()
+                )
+            : "Pending"
+        );
+
+        setStaff(
+          issueData.assignedTo?.name ||
+          issueData.assignedTo?.email ||
+          issueData.assignedTo ||
+          ""
+        );
+
+        setAdminNote(
+          issueData.adminNote ||
+          issueData.note ||
+          ""
+        );
+      } catch (err) {
+        setError(
+          err.message || "Failed to load issue."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIssue();
+  }, [id]);
+
+  const handleUpdate = async (e) => {
     e.preventDefault();
 
-    setMessage("Issue details updated successfully!");
+    try {
+      setSaving(true);
+      setMessage("");
+      setError("");
 
+      await updateAdminIssue(id, {
+        status,
+        assignedTo: staff,
+        adminNote,
+      });
+
+      setMessage(
+        "Issue details updated successfully!"
+      );
+    } catch (err) {
+      setError(
+        err.message || "Failed to update issue."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="page-content">
+          <div className="no-issues">
+            <h2>Loading issue...</h2>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error && !issue) {
+    return (
+      <AdminLayout>
+        <div className="page-content">
+          <Link
+            to="/admin/issues"
+            className="back-link"
+          >
+            ← Back to All Issues
+          </Link>
+
+          <div className="error-message">
+            ⚠ {error}
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -757,19 +452,17 @@ function AdminIssueDetails() {
           ← Back to All Issues
         </Link>
 
-
         <div className="issue-detail-header">
 
           <h1>
-            WiFi not working
+            {issue?.title || "Untitled Issue"}
           </h1>
 
           <p>
-            Issue #{id}
+            Issue #{issue?._id || issue?.id || id}
           </p>
 
         </div>
-
 
         <div className="admin-detail-grid">
 
@@ -781,47 +474,62 @@ function AdminIssueDetails() {
               Issue Information
             </h2>
 
-
             <div className="issue-information-grid">
 
               <div>
                 <span>Category</span>
-                <strong>Network</strong>
+                <strong>
+                  {issue?.category || "—"}
+                </strong>
               </div>
 
               <div>
                 <span>Location</span>
-                <strong>Lab 3</strong>
+                <strong>
+                  {issue?.location || "—"}
+                </strong>
               </div>
 
               <div>
                 <span>Department</span>
-                <strong>CSE-AIML</strong>
+                <strong>
+                  {issue?.department || "—"}
+                </strong>
               </div>
 
               <div>
                 <span>Priority</span>
-                <strong className="priority-high">
-                  High
+                <strong
+                  className={`priority-${(
+                    issue?.priority || "Low"
+                  ).toLowerCase()}`}
+                >
+                  {issue?.priority || "Low"}
                 </strong>
               </div>
 
               <div>
                 <span>Reported</span>
                 <strong>
-                  16 Sept 2026
+                  {issue?.createdAt
+                    ? new Date(
+                        issue.createdAt
+                      ).toLocaleDateString()
+                    : issue?.date || "—"}
                 </strong>
               </div>
 
               <div>
                 <span>Reported By</span>
                 <strong>
-                  Student
+                  {issue?.reportedBy?.name ||
+                    issue?.reportedBy?.email ||
+                    issue?.reportedBy ||
+                    "Student"}
                 </strong>
               </div>
 
             </div>
-
 
             <div className="description-section">
 
@@ -830,15 +538,13 @@ function AdminIssueDetails() {
               </h3>
 
               <p>
-                The WiFi connection is not working properly in Lab 3.
-                Students are unable to access the internet during
-                laboratory sessions.
+                {issue?.description ||
+                  "No description provided."}
               </p>
 
             </div>
 
           </section>
-
 
           {/* ADMIN ACTION */}
 
@@ -849,7 +555,6 @@ function AdminIssueDetails() {
             </h2>
 
             <form onSubmit={handleUpdate}>
-
 
               <div className="form-group">
 
@@ -865,22 +570,21 @@ function AdminIssueDetails() {
                   }}
                 >
 
-                  <option>
+                  <option value="Pending">
                     Pending
                   </option>
 
-                  <option>
+                  <option value="In Progress">
                     In Progress
                   </option>
 
-                  <option>
+                  <option value="Resolved">
                     Resolved
                   </option>
 
                 </select>
 
               </div>
-
 
               <div className="form-group">
 
@@ -896,26 +600,29 @@ function AdminIssueDetails() {
                   }}
                 >
 
-                  <option>
+                  <option value="">
+                    Select Staff
+                  </option>
+
+                  <option value="Campus Network Staff">
                     Campus Network Staff
                   </option>
 
-                  <option>
+                  <option value="Electrical Maintenance Staff">
                     Electrical Maintenance Staff
                   </option>
 
-                  <option>
+                  <option value="Laboratory Staff">
                     Laboratory Staff
                   </option>
 
-                  <option>
+                  <option value="General Maintenance Staff">
                     General Maintenance Staff
                   </option>
 
                 </select>
 
               </div>
-
 
               <div className="form-group">
 
@@ -926,25 +633,35 @@ function AdminIssueDetails() {
                 <textarea
                   rows="5"
                   placeholder="Add a note about this issue..."
+                  value={adminNote}
+                  onChange={(e) => {
+                    setAdminNote(e.target.value);
+                    setMessage("");
+                  }}
                 />
 
               </div>
 
+              {error && (
+                <div className="error-message">
+                  ⚠ {error}
+                </div>
+              )}
 
               {message && (
-
                 <div className="success-message">
                   ✓ {message}
                 </div>
-
               )}
-
 
               <button
                 type="submit"
                 className="save-profile-button"
+                disabled={saving}
               >
-                Update Issue
+                {saving
+                  ? "Updating..."
+                  : "Update Issue"}
               </button>
 
             </form>
@@ -965,67 +682,205 @@ function AdminIssueDetails() {
 ========================================================= */
 
 function AdminUsers() {
-
+  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
 
+  const [showForm, setShowForm] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
 
-  const users = [
-    {
-      id: 1,
-      name: "Student One",
-      email: "student1@example.com",
-      role: "Student",
-      department: "CSE-AIML",
-      status: "Active"
-    },
-    {
-      id: 2,
-      name: "Student Two",
-      email: "student2@example.com",
-      role: "Student",
-      department: "ISE",
-      status: "Active"
-    },
-    {
-      id: 3,
-      name: "Network Staff",
-      email: "network@example.com",
-      role: "Staff",
-      department: "Network",
-      status: "Active"
-    },
-    {
-      id: 4,
-      name: "Electrical Staff",
-      email: "electrical@example.com",
-      role: "Staff",
-      department: "Electrical",
-      status: "Active"
-    },
-    {
-      id: 5,
-      name: "Maintenance Staff",
-      email: "maintenance@example.com",
-      role: "Staff",
-      department: "Maintenance",
-      status: "Inactive"
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("student");
+  const [department, setDepartment] = useState("");
+  const [year, setYear] = useState("");
+  const [phone, setPhone] = useState("");
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await getAdminUsers();
+
+      const userList =
+        response.users ||
+        response.data ||
+        response ||
+        [];
+
+      setUsers(
+        Array.isArray(userList) ? userList : []
+      );
+    } catch (err) {
+      setError(
+        err.message || "Failed to load users."
+      );
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const resetForm = () => {
+    setName("");
+    setEmail("");
+    setPassword("");
+    setRole("student");
+    setDepartment("");
+    setYear("");
+    setPhone("");
+    setEditingUser(null);
+    setShowForm(false);
+    setMessage("");
+  };
+
+  const handleEdit = (user) => {
+    setEditingUser(user);
+
+    setName(user.name || "");
+    setEmail(user.email || "");
+    setPassword("");
+    setRole(
+      (user.role || "student").toLowerCase()
+    );
+    setDepartment(user.department || "");
+    setYear(user.year || "");
+    setPhone(user.phone || "");
+
+    setMessage("");
+    setError("");
+    setShowForm(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      setSaving(true);
+      setError("");
+      setMessage("");
+
+      if (!name || !email) {
+        setError("Name and email are required.");
+        return;
+      }
+
+      if (!editingUser && !password) {
+        setError("Password is required for a new user.");
+        return;
+      }
+
+      if (editingUser) {
+        await updateAdminUser(
+          editingUser._id || editingUser.id,
+          {
+            name,
+            role,
+            department,
+            year,
+            phone,
+          }
+        );
+
+        setMessage(
+          "User updated successfully!"
+        );
+      } else {
+        await createAdminUser({
+          name,
+          email,
+          password,
+          role,
+          department,
+          year,
+          phone,
+        });
+
+        setMessage(
+          "User created successfully!"
+        );
+      }
+
+      await fetchUsers();
+
+      setTimeout(() => {
+        resetForm();
+      }, 500);
+
+    } catch (err) {
+      setError(
+        err.message || "Failed to save user."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStatusToggle = async (user) => {
+    try {
+      setError("");
+      setMessage("");
+
+      const currentStatus =
+        (user.status || "active").toLowerCase();
+
+      const newStatus =
+        currentStatus === "active"
+          ? "inactive"
+          : "active";
+
+      await updateAdminUserStatus(
+        user._id || user.id,
+        {
+          status: newStatus,
+        }
+      );
+
+      setMessage(
+        `User ${
+          newStatus === "active"
+            ? "activated"
+            : "deactivated"
+        } successfully!`
+      );
+
+      await fetchUsers();
+
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to update user status."
+      );
+    }
+  };
 
   const filteredUsers = users.filter((user) => {
-
     const text = search.toLowerCase();
 
     return (
-      user.name.toLowerCase().includes(text) ||
-      user.email.toLowerCase().includes(text) ||
-      user.role.toLowerCase().includes(text) ||
-      user.department.toLowerCase().includes(text)
+      (user.name || "")
+        .toLowerCase()
+        .includes(text) ||
+      (user.email || "")
+        .toLowerCase()
+        .includes(text) ||
+      (user.role || "")
+        .toLowerCase()
+        .includes(text) ||
+      (user.department || "")
+        .toLowerCase()
+        .includes(text)
     );
-
   });
-
 
   return (
     <AdminLayout>
@@ -1044,107 +899,340 @@ function AdminUsers() {
 
         </div>
 
-
         <div className="admin-user-toolbar">
 
           <input
             type="text"
             placeholder="🔍 Search users..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
           />
 
-          <button className="primary-button">
-            + Add User
+          <button
+            className="primary-button"
+            type="button"
+            onClick={() => {
+              if (showForm) {
+                resetForm();
+              } else {
+                setEditingUser(null);
+                setMessage("");
+                setError("");
+                setShowForm(true);
+              }
+            }}
+          >
+            {showForm
+              ? "Cancel"
+              : "+ Add User"}
           </button>
 
         </div>
 
+        {showForm && (
+          <section className="detail-card">
+
+            <h2>
+              {editingUser
+                ? "Edit User"
+                : "Add New User"}
+            </h2>
+
+            <form onSubmit={handleSubmit}>
+
+              <div className="profile-form-grid">
+
+                <div className="profile-form-group">
+                  <label>
+                    Full Name
+                  </label>
+
+                  <input
+                    value={name}
+                    onChange={(e) =>
+                      setName(e.target.value)
+                    }
+                    placeholder="Enter full name"
+                  />
+                </div>
+
+                <div className="profile-form-group">
+                  <label>
+                    Email
+                  </label>
+
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) =>
+                      setEmail(e.target.value)
+                    }
+                    placeholder="Enter email"
+                    disabled={!!editingUser}
+                  />
+                </div>
+
+                {!editingUser && (
+                  <div className="profile-form-group">
+                    <label>
+                      Password
+                    </label>
+
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) =>
+                        setPassword(e.target.value)
+                      }
+                      placeholder="Minimum 6 characters"
+                    />
+                  </div>
+                )}
+
+                <div className="profile-form-group">
+                  <label>
+                    Role
+                  </label>
+
+                  <select
+                    value={role}
+                    onChange={(e) =>
+                      setRole(e.target.value)
+                    }
+                  >
+                    <option value="student">
+                      Student
+                    </option>
+
+                    <option value="staff">
+                      Staff
+                    </option>
+
+                    <option value="admin">
+                      Admin
+                    </option>
+                  </select>
+                </div>
+
+                <div className="profile-form-group">
+                  <label>
+                    Department
+                  </label>
+
+                  <input
+                    value={department}
+                    onChange={(e) =>
+                      setDepartment(e.target.value)
+                    }
+                    placeholder="Enter department"
+                  />
+                </div>
+
+                <div className="profile-form-group">
+                  <label>
+                    Year
+                  </label>
+
+                  <input
+                    value={year}
+                    onChange={(e) =>
+                      setYear(e.target.value)
+                    }
+                    placeholder="Enter year"
+                  />
+                </div>
+
+                <div className="profile-form-group">
+                  <label>
+                    Phone
+                  </label>
+
+                  <input
+                    value={phone}
+                    onChange={(e) =>
+                      setPhone(e.target.value)
+                    }
+                    placeholder="Enter phone number"
+                  />
+                </div>
+
+              </div>
+
+              {error && (
+                <div className="error-message">
+                  ⚠ {error}
+                </div>
+              )}
+
+              {message && (
+                <div className="success-message">
+                  ✓ {message}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="save-profile-button"
+                disabled={saving}
+              >
+                {saving
+                  ? "Saving..."
+                  : editingUser
+                  ? "Update User"
+                  : "Create User"}
+              </button>
+
+            </form>
+
+          </section>
+        )}
+
+        {!showForm && message && (
+          <div className="success-message">
+            ✓ {message}
+          </div>
+        )}
+
+        {error && !showForm && (
+          <div className="error-message">
+            ⚠ {error}
+          </div>
+        )}
 
         <p className="resource-count">
-          Showing {filteredUsers.length} of {users.length} users
+          Showing {filteredUsers.length} of{" "}
+          {users.length} users
         </p>
 
+        {loading ? (
 
-        <div className="table-card">
+          <div className="no-issues">
+            <h2>Loading users...</h2>
+          </div>
 
-          <table>
+        ) : filteredUsers.length === 0 ? (
 
-            <thead>
+          <div className="no-issues">
+            <h2>No users found</h2>
+            <p>
+              No users match the current search.
+            </p>
+          </div>
 
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Department</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
+        ) : (
 
-            </thead>
+          <div className="table-card">
 
-            <tbody>
+            <table>
 
-              {filteredUsers.map((user) => (
-
-                <tr key={user.id}>
-
-                  <td>
-                    <strong>
-                      {user.name}
-                    </strong>
-                  </td>
-
-                  <td>
-                    {user.email}
-                  </td>
-
-                  <td>
-                    {user.role}
-                  </td>
-
-                  <td>
-                    {user.department}
-                  </td>
-
-                  <td>
-
-                    <span
-                      className={
-                        user.status === "Active"
-                          ? "status resolved"
-                          : "status pending"
-                      }
-                    >
-                      {user.status}
-                    </span>
-
-                  </td>
-
-                  <td>
-
-                    <button className="text-button">
-                      Edit
-                    </button>
-
-                  </td>
-
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th>Status</th>
+                  <th>Action</th>
                 </tr>
+              </thead>
 
-              ))}
+              <tbody>
 
-            </tbody>
+                {filteredUsers.map((user) => {
 
-          </table>
+                  const userId =
+                    user._id || user.id;
 
-        </div>
+                  const isActive =
+                    (user.status || "active")
+                      .toLowerCase() === "active";
+
+                  return (
+                    <tr key={userId}>
+
+                      <td>
+                        <strong>
+                          {user.name || "—"}
+                        </strong>
+                      </td>
+
+                      <td>
+                        {user.email || "—"}
+                      </td>
+
+                      <td>
+                        {(user.role || "—")
+                          .charAt(0)
+                          .toUpperCase() +
+                          (user.role || "")
+                            .slice(1)}
+                      </td>
+
+                      <td>
+                        {user.department || "—"}
+                      </td>
+
+                      <td>
+                        <span
+                          className={
+                            isActive
+                              ? "status resolved"
+                              : "status pending"
+                          }
+                        >
+                          {isActive
+                            ? "Active"
+                            : "Inactive"}
+                        </span>
+                      </td>
+
+                      <td>
+
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() =>
+                            handleEdit(user)
+                          }
+                        >
+                          Edit
+                        </button>
+
+                        {" "}
+
+                        <button
+                          className="text-button"
+                          type="button"
+                          onClick={() =>
+                            handleStatusToggle(user)
+                          }
+                        >
+                          {isActive
+                            ? "Deactivate"
+                            : "Activate"}
+                        </button>
+
+                      </td>
+
+                    </tr>
+                  );
+                })}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        )}
 
       </div>
 
     </AdminLayout>
   );
 }
-
 
 /* =========================================================
    RESOURCE MANAGEMENT
@@ -1435,58 +1523,113 @@ function AdminResources() {
 /* =========================================================
    ANALYTICS
 ========================================================= */
-
 function AdminAnalytics() {
+  const [analytics, setAnalytics] =
+    useState(null);
+
+  const [insights, setInsights] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response =
+        await getAnalytics();
+
+      setAnalytics(response);
+
+      try {
+        const insightResponse =
+          await generateInsights();
+
+        setInsights(
+          insightResponse.insights || []
+        );
+      } catch {
+        setInsights([]);
+      }
+
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to load analytics."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  if (loading) {
+    return (
+      <AdminLayout>
+
+        <div className="page-content">
+
+          <div className="no-issues">
+            <h2>
+              Loading analytics...
+            </h2>
+          </div>
+
+        </div>
+
+      </AdminLayout>
+    );
+  }
 
   const statusData = [
-
     {
       name: "Pending",
-      value: 7
+      value:
+        analytics?.issuesByStatus
+          ?.Pending ||
+        analytics?.pending ||
+        0,
     },
 
     {
       name: "In Progress",
-      value: 6
+      value:
+        analytics?.issuesByStatus?.[
+          "In Progress"
+        ] ||
+        analytics?.inProgress ||
+        0,
     },
 
     {
       name: "Resolved",
-      value: 11
-    }
-
+      value:
+        analytics?.issuesByStatus
+          ?.Resolved ||
+        analytics?.resolved ||
+        0,
+    },
   ];
 
-
-  const categoryData = [
-
-    {
-      category: "Network",
-      issues: 7
-    },
-
-    {
-      category: "Electrical",
-      issues: 5
-    },
-
-    {
-      category: "Classroom",
-      issues: 4
-    },
-
-    {
-      category: "Plumbing",
-      issues: 3
-    },
-
-    {
-      category: "Furniture",
-      issues: 3
-    }
-
-  ];
-
+  const categoryData = Object.entries(
+    analytics?.issuesByCategory || {}
+  )
+    .map(([category, issues]) => ({
+      category,
+      issues,
+    }))
+    .sort(
+      (a, b) =>
+        b.issues - a.issues
+    );
 
   return (
     <AdminLayout>
@@ -1505,6 +1648,11 @@ function AdminAnalytics() {
 
         </div>
 
+        {error && (
+          <div className="error-message">
+            ⚠ {error}
+          </div>
+        )}
 
         {/* KPI */}
 
@@ -1517,7 +1665,7 @@ function AdminAnalytics() {
             </span>
 
             <strong>
-              24
+              {analytics?.totalIssues || 0}
             </strong>
 
           </div>
@@ -1529,7 +1677,7 @@ function AdminAnalytics() {
             </span>
 
             <strong>
-              8
+              {analytics?.highPriority || 0}
             </strong>
 
           </div>
@@ -1541,7 +1689,7 @@ function AdminAnalytics() {
             </span>
 
             <strong>
-              46%
+              {analytics?.resolutionRate || 0}%
             </strong>
 
           </div>
@@ -1553,18 +1701,16 @@ function AdminAnalytics() {
             </span>
 
             <strong>
-              6
+              {analytics?.activeStaff || 0}
             </strong>
 
           </div>
 
         </div>
 
-
         {/* CHARTS */}
 
         <div className="analytics-grid">
-
 
           {/* PIE CHART */}
 
@@ -1615,7 +1761,6 @@ function AdminAnalytics() {
 
           </section>
 
-
           {/* BAR CHART */}
 
           <section className="detail-card">
@@ -1626,40 +1771,53 @@ function AdminAnalytics() {
 
             <div className="chart-container">
 
-              <ResponsiveContainer
-                width="100%"
-                height={300}
-              >
+              {categoryData.length === 0 ? (
 
-                <BarChart data={categoryData}>
+                <div className="no-issues">
+                  <p>
+                    No category data available.
+                  </p>
+                </div>
 
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                  />
+              ) : (
 
-                  <XAxis
-                    dataKey="category"
-                  />
+                <ResponsiveContainer
+                  width="100%"
+                  height={300}
+                >
 
-                  <YAxis />
+                  <BarChart
+                    data={categoryData}
+                  >
 
-                  <Tooltip />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                    />
 
-                  <Bar
-                    dataKey="issues"
-                    name="Issues"
-                  />
+                    <XAxis
+                      dataKey="category"
+                    />
 
-                </BarChart>
+                    <YAxis />
 
-              </ResponsiveContainer>
+                    <Tooltip />
+
+                    <Bar
+                      dataKey="issues"
+                      name="Issues"
+                    />
+
+                  </BarChart>
+
+                </ResponsiveContainer>
+
+              )}
 
             </div>
 
           </section>
 
         </div>
-
 
         {/* INSIGHTS */}
 
@@ -1669,75 +1827,75 @@ function AdminAnalytics() {
             Key Insights
           </h2>
 
+          {insights.length === 0 ? (
 
-          <div className="insight-list">
+            <div className="insight-list">
 
-            <div className="insight-item">
+              <div className="insight-item">
 
-              <span>
-                🔴
-              </span>
+                <span>
+                  ℹ️
+                </span>
 
-              <div>
+                <div>
 
-                <strong>
-                  Network issues require attention
-                </strong>
+                  <strong>
+                    No insights available
+                  </strong>
 
-                <p>
-                  Network-related problems represent a significant
-                  portion of reported campus issues.
-                </p>
+                  <p>
+                    More issue data is required to generate operational insights.
+                  </p>
 
-              </div>
-
-            </div>
-
-
-            <div className="insight-item">
-
-              <span>
-                🟠
-              </span>
-
-              <div>
-
-                <strong>
-                  Several issues are still pending
-                </strong>
-
-                <p>
-                  Pending issues should be reviewed and assigned
-                  to appropriate staff members.
-                </p>
+                </div>
 
               </div>
 
             </div>
 
+          ) : (
 
-            <div className="insight-item">
+            <div className="insight-list">
 
-              <span>
-                🟢
-              </span>
+              {insights.map(
+                (insight, index) => (
 
-              <div>
+                  <div
+                    className="insight-item"
+                    key={
+                      `${insight.type || "insight"}-${index}`
+                    }
+                  >
 
-                <strong>
-                  Issues are being resolved
-                </strong>
+                    <span>
+                      {insight.urgency === "High"
+                        ? "🔴"
+                        : insight.urgency ===
+                          "Medium"
+                        ? "🟠"
+                        : "🟢"}
+                    </span>
 
-                <p>
-                  Resolved issues indicate that the campus
-                  maintenance workflow is being tracked.
-                </p>
+                    <div>
 
-              </div>
+                      <strong>
+                        {insight.title}
+                      </strong>
+
+                      <p>
+                        {insight.detail}
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                )
+              )}
 
             </div>
 
-          </div>
+          )}
 
         </section>
 
@@ -1746,29 +1904,118 @@ function AdminAnalytics() {
     </AdminLayout>
   );
 }
-
-
 /* =========================================================
    ADMIN PROFILE
 ========================================================= */
 
 function AdminProfile() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState("Administrator");
 
-  const [name, setName] = useState("Admin Name");
-  const [email, setEmail] = useState("admin@example.com");
-  const [phone, setPhone] = useState("9876543210");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
+  const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-  const handleSubmit = (e) => {
+        const response =
+          await getProfile();
 
+        const profile =
+          response.user ||
+          response.data ||
+          response;
+
+        setName(profile.name || "");
+        setEmail(profile.email || "");
+
+        setPhone(profile.phone || "");
+
+        setRole(
+          profile.role === "admin"
+            ? "Administrator"
+            : profile.role || "Administrator"
+        );
+
+      } catch (err) {
+        setError(
+          err.message ||
+            "Failed to load profile."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    setMessage("Profile updated successfully!");
+    try {
+      setSaving(true);
+      setError("");
+      setMessage("");
 
+      const response =
+        await updateProfile({
+          name,
+          phone,
+        });
+
+      const updatedProfile =
+        response.user ||
+        response.data ||
+        response;
+
+      if (updatedProfile.name) {
+        setName(updatedProfile.name);
+      }
+
+      if (updatedProfile.phone !== undefined) {
+        setPhone(updatedProfile.phone);
+      }
+
+      setMessage(
+        "Profile updated successfully!"
+      );
+
+    } catch (err) {
+      setError(
+        err.message ||
+          "Failed to update profile."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
+  if (loading) {
+    return (
+      <AdminLayout>
+
+        <div className="page-content">
+
+          <div className="no-issues">
+            <h2>
+              Loading profile...
+            </h2>
+          </div>
+
+        </div>
+
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -1787,9 +2034,13 @@ function AdminProfile() {
 
         </div>
 
+        {error && (
+          <div className="error-message">
+            ⚠ {error}
+          </div>
+        )}
 
         <div className="staff-profile-grid">
-
 
           {/* SUMMARY */}
 
@@ -1798,25 +2049,26 @@ function AdminProfile() {
             <div className="profile-avatar">
 
               {name
-                .charAt(0)
-                .toUpperCase()}
+                ? name
+                    .charAt(0)
+                    .toUpperCase()
+                : "A"}
 
             </div>
 
             <h2>
-              {name}
+              {name || "Admin"}
             </h2>
 
             <p>
-              {email}
+              {email || "—"}
             </p>
 
             <span className="profile-role">
-              Administrator
+              {role}
             </span>
 
           </section>
-
 
           {/* FORM */}
 
@@ -1829,7 +2081,6 @@ function AdminProfile() {
             <form onSubmit={handleSubmit}>
 
               <div className="profile-form-grid">
-
 
                 <div className="profile-form-group">
 
@@ -1847,7 +2098,6 @@ function AdminProfile() {
 
                 </div>
 
-
                 <div className="profile-form-group">
 
                   <label>
@@ -1857,14 +2107,10 @@ function AdminProfile() {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setMessage("");
-                    }}
+                    disabled
                   />
 
                 </div>
-
 
                 <div className="profile-form-group">
 
@@ -1882,7 +2128,6 @@ function AdminProfile() {
 
                 </div>
 
-
                 <div className="profile-form-group">
 
                   <label>
@@ -1890,7 +2135,7 @@ function AdminProfile() {
                   </label>
 
                   <input
-                    value="Administrator"
+                    value={role}
                     disabled
                   />
 
@@ -1898,21 +2143,20 @@ function AdminProfile() {
 
               </div>
 
-
               {message && (
-
                 <div className="success-message">
                   ✓ {message}
                 </div>
-
               )}
-
 
               <button
                 type="submit"
                 className="save-profile-button"
+                disabled={saving}
               >
-                Save Changes
+                {saving
+                  ? "Saving..."
+                  : "Save Changes"}
               </button>
 
             </form>
@@ -1926,8 +2170,6 @@ function AdminProfile() {
     </AdminLayout>
   );
 }
-
-
 /* =========================================================
    MAIN ADMIN ROUTER
 ========================================================= */

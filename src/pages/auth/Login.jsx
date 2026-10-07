@@ -1,14 +1,18 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
+import { loginUser } from "../../services/api";
 
 function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
@@ -33,8 +37,38 @@ function Login() {
       return;
     }
 
-    // Temporary login
-    alert("Login validation successful!");
+    try {
+      setLoading(true);
+
+      const response = await loginUser({
+        email: email.trim(),
+        password,
+      });
+
+      // Save authentication data
+      if (response.token) {
+        localStorage.setItem("token", response.token);
+      }
+
+      if (response.user) {
+        localStorage.setItem("user", JSON.stringify(response.user));
+      }
+
+      // Redirect based on user role
+      const role = response.user?.role;
+
+      if (role === "admin") {
+        navigate("/admin");
+      } else if (role === "staff") {
+        navigate("/staff");
+      } else {
+        navigate("/student");
+      }
+    } catch (err) {
+      setError(err.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -60,6 +94,7 @@ function Login() {
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
             />
           </div>
 
@@ -75,6 +110,7 @@ function Login() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
               />
 
               <button
@@ -82,6 +118,7 @@ function Login() {
                 className="password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label="Toggle password visibility"
+                disabled={loading}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -93,7 +130,7 @@ function Login() {
           <div className="login-options">
 
             <label className="remember-me">
-              <input type="checkbox" />
+              <input type="checkbox" disabled={loading} />
               <span>Remember me</span>
             </label>
 
@@ -101,6 +138,7 @@ function Login() {
               type="button"
               className="forgot-password"
               onClick={() => alert("Forgot password feature coming soon.")}
+              disabled={loading}
             >
               Forgot password?
             </button>
@@ -115,8 +153,12 @@ function Login() {
           )}
 
           {/* Login Button */}
-          <button type="submit" className="login-button">
-            Login
+          <button
+            type="submit"
+            className="login-button"
+            disabled={loading}
+          >
+            {loading ? "Logging in..." : "Login"}
           </button>
 
         </form>
