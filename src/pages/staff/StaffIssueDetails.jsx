@@ -39,8 +39,8 @@ function StaffIssueDetails() {
         );
 
         setResolutionDetails(
+          issueData.resolutionNote ||
           issueData.resolution ||
-          issueData.resolutionNotes ||
           ""
         );
       } catch (err) {
@@ -76,7 +76,7 @@ function StaffIssueDetails() {
       const response = await updateIssueStatus(id, {
         status,
         staffUpdate,
-        resolutionDetails
+        resolutionNote: resolutionDetails,
       });
 
       const updatedIssue =

@@ -102,7 +102,7 @@ function StudentDashboard() {
 
         <button
           className="primary-button"
-          onClick={() => navigate("/student/report")}
+          onClick={() => navigate("/student/report-issue")}
         >
           + Report New Issue
         </button>
