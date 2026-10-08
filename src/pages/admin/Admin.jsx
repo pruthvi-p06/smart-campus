@@ -327,6 +327,7 @@ function AdminIssueDetails() {
   const [issue, setIssue] = useState(null);
   const [status, setStatus] = useState("Pending");
   const [staff, setStaff] = useState("");
+  const [staffUsers, setStaffUsers] = useState([]);
   const [adminNote, setAdminNote] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -335,53 +336,65 @@ function AdminIssueDetails() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const fetchIssue = async () => {
-      try {
-        setLoading(true);
-        setError("");
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-        const response = await getAdminIssue(id);
+      const [issueResponse, usersResponse] =
+        await Promise.all([
+          getAdminIssue(id),
+          getAdminUsers()
+        ]);
 
-        const issueData =
-          response.issue ||
-          response.data ||
-          response;
+      const issueData =
+        issueResponse.issue ||
+        issueResponse.data ||
+        issueResponse;
 
-        setIssue(issueData);
+      const users =
+        usersResponse.users ||
+        usersResponse.data ||
+        usersResponse ||
+        [];
 
-        setStatus(
-          issueData.status
-            ? issueData.status
-                .replace(/_/g, " ")
-                .replace(/\b\w/g, (char) =>
-                  char.toUpperCase()
-                )
-            : "Pending"
-        );
+      const staffList = Array.isArray(users)
+        ? users.filter(
+            (user) =>
+              user.role === "staff" &&
+              user.status !== "inactive"
+          )
+        : [];
 
-        setStaff(
-          issueData.assignedTo?.name ||
-          issueData.assignedTo?.email ||
-          issueData.assignedTo ||
-          ""
-        );
+      setStaffUsers(staffList);
+      setIssue(issueData);
 
-        setAdminNote(
-          issueData.adminNote ||
-          issueData.note ||
-          ""
-        );
-      } catch (err) {
-        setError(
-          err.message || "Failed to load issue."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      setStatus(
+        issueData.status
+          ? issueData.status
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (char) =>
+                char.toUpperCase()
+              )
+          : "Pending"
+      );
 
-    fetchIssue();
-  }, [id]);
+      setStaff(
+        issueData.assignedTo?._id || ""
+      );
+
+    } catch (err) {
+      setError(
+        err.message ||
+        "Failed to load issue."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, [id]);
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -593,34 +606,25 @@ function AdminIssueDetails() {
                 </label>
 
                 <select
-                  value={staff}
-                  onChange={(e) => {
-                    setStaff(e.target.value);
-                    setMessage("");
-                  }}
-                >
+  value={staff}
+  onChange={(e) => {
+    setStaff(e.target.value);
+    setMessage("");
+  }}
+>
+  <option value="">
+    Select Staff
+  </option>
 
-                  <option value="">
-                    Select Staff
-                  </option>
-
-                  <option value="Campus Network Staff">
-                    Campus Network Staff
-                  </option>
-
-                  <option value="Electrical Maintenance Staff">
-                    Electrical Maintenance Staff
-                  </option>
-
-                  <option value="Laboratory Staff">
-                    Laboratory Staff
-                  </option>
-
-                  <option value="General Maintenance Staff">
-                    General Maintenance Staff
-                  </option>
-
-                </select>
+  {staffUsers.map((user) => (
+    <option
+      key={user._id}
+      value={user._id}
+    >
+      {user.name}
+    </option>
+  ))}
+</select>
 
               </div>
 
