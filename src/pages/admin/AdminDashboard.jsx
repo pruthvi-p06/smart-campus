@@ -1,73 +1,100 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import AdminSidebar from "../../components/AdminSidebar";
+import {
+  getAnalytics,
+  getAdminIssues
+} from "../../services/api";
 
 function AdminDashboard() {
+  const [analytics, setAnalytics] = useState({});
+  const [recentIssues, setRecentIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [analyticsResponse, issuesResponse] = await Promise.all([
+          getAnalytics(),
+          getAdminIssues()
+        ]);
+
+        const analyticsData =
+          analyticsResponse?.analytics ||
+          analyticsResponse?.data ||
+          analyticsResponse ||
+          {};
+
+        const issuesData =
+          issuesResponse?.issues ||
+          issuesResponse?.data ||
+          issuesResponse ||
+          [];
+
+        setAnalytics(analyticsData);
+
+        setRecentIssues(
+          Array.isArray(issuesData)
+            ? issuesData.slice(0, 4)
+            : []
+        );
+      } catch (err) {
+        console.error("Dashboard error:", err);
+        setError(err.message || "Failed to load dashboard data.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  const getStatValue = (...keys) => {
+    for (const key of keys) {
+      if (analytics?.[key] !== undefined) {
+        return analytics[key];
+      }
+    }
+    return 0;
+  };
 
   const stats = [
     {
       title: "Total Issues",
-      value: "24"
+      value: getStatValue("totalIssues", "total")
     },
     {
       title: "Pending",
-      value: "7"
+      value: getStatValue("pendingIssues", "pending")
     },
     {
       title: "In Progress",
-      value: "6"
+      value: getStatValue("inProgressIssues", "inProgress")
     },
     {
       title: "Resolved",
-      value: "11"
+      value: getStatValue("resolvedIssues", "resolved")
     }
   ];
 
+  const formatStatus = (status) => {
+    if (!status) return "Pending";
 
-  const recentIssues = [
-    {
-      id: 1,
-      issue: "WiFi not working",
-      category: "Network",
-      location: "Lab 3",
-      priority: "High",
-      status: "Pending"
-    },
-    {
-      id: 2,
-      issue: "Broken Fan",
-      category: "Electrical",
-      location: "Block A",
-      priority: "Medium",
-      status: "In Progress"
-    },
-    {
-      id: 3,
-      issue: "Projector problem",
-      category: "Classroom",
-      location: "Room 205",
-      priority: "Low",
-      status: "Resolved"
-    },
-    {
-      id: 4,
-      issue: "Water leakage",
-      category: "Plumbing",
-      location: "Block B",
-      priority: "High",
-      status: "Pending"
-    }
-  ];
-
+    return String(status)
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  };
 
   return (
-
     <div className="dashboard-layout">
 
       <AdminSidebar />
 
       <main className="main-content">
-
-        {/* Top Navbar */}
 
         <header className="top-navbar">
 
@@ -75,9 +102,7 @@ function AdminDashboard() {
 
           <div className="navbar-right">
 
-            <span>🔔</span>
-
-            <Link to="/admin/profile">
+  <Link to="/admin/profile">
               Profile
             </Link>
 
@@ -85,27 +110,25 @@ function AdminDashboard() {
 
         </header>
 
-
-        {/* Dashboard */}
-
         <div className="page-content">
 
           <div className="admin-dashboard-header">
 
             <div>
-
-              <h1>
-                Admin Dashboard
-              </h1>
+              <h1>Admin Dashboard</h1>
 
               <p>
                 Monitor and manage campus issues, users and resources.
               </p>
-
             </div>
 
           </div>
 
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
 
           {/* Statistics */}
 
@@ -123,7 +146,7 @@ function AdminDashboard() {
                 </span>
 
                 <strong>
-                  {stat.value}
+                  {loading ? "..." : stat.value}
                 </strong>
 
               </div>
@@ -132,19 +155,13 @@ function AdminDashboard() {
 
           </div>
 
-
           {/* Quick Actions */}
 
           <section className="admin-section">
 
             <div className="section-heading">
-
-              <h2>
-                Quick Actions
-              </h2>
-
+              <h2>Quick Actions</h2>
             </div>
-
 
             <div className="quick-actions">
 
@@ -152,93 +169,70 @@ function AdminDashboard() {
                 to="/admin/issues"
                 className="quick-action-card"
               >
-
                 <span className="quick-action-icon">
                   📋
                 </span>
 
                 <div>
-
-                  <h3>
-                    Manage Issues
-                  </h3>
+                  <h3>Manage Issues</h3>
 
                   <p>
                     View, assign and update campus issues.
                   </p>
-
                 </div>
 
               </Link>
-
 
               <Link
                 to="/admin/users"
                 className="quick-action-card"
               >
-
                 <span className="quick-action-icon">
                   👥
                 </span>
 
                 <div>
-
-                  <h3>
-                    Manage Users
-                  </h3>
+                  <h3>Manage Users</h3>
 
                   <p>
                     Manage students and staff accounts.
                   </p>
-
                 </div>
 
               </Link>
-
 
               <Link
                 to="/admin/resources"
                 className="quick-action-card"
               >
-
                 <span className="quick-action-icon">
                   🏫
                 </span>
 
                 <div>
-
-                  <h3>
-                    Manage Resources
-                  </h3>
+                  <h3>Manage Resources</h3>
 
                   <p>
                     Add and manage campus facilities.
                   </p>
-
                 </div>
 
               </Link>
-
 
               <Link
                 to="/admin/analytics"
                 className="quick-action-card"
               >
-
                 <span className="quick-action-icon">
                   📊
                 </span>
 
                 <div>
-
-                  <h3>
-                    View Analytics
-                  </h3>
+                  <h3>View Analytics</h3>
 
                   <p>
                     Analyze campus issue trends and insights.
                   </p>
-
                 </div>
 
               </Link>
@@ -246,7 +240,6 @@ function AdminDashboard() {
             </div>
 
           </section>
-
 
           {/* Recent Issues */}
 
@@ -264,7 +257,6 @@ function AdminDashboard() {
 
             </div>
 
-
             <div className="table-card">
 
               <table>
@@ -272,92 +264,102 @@ function AdminDashboard() {
                 <thead>
 
                   <tr>
-
-                    <th>
-                      Issue
-                    </th>
-
-                    <th>
-                      Category
-                    </th>
-
-                    <th>
-                      Location
-                    </th>
-
-                    <th>
-                      Priority
-                    </th>
-
-                    <th>
-                      Status
-                    </th>
-
-                    <th>
-                      Action
-                    </th>
-
+                    <th>Issue</th>
+                    <th>Category</th>
+                    <th>Location</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Action</th>
                   </tr>
 
                 </thead>
 
-
                 <tbody>
 
-                  {recentIssues.map((issue) => (
+                  {loading ? (
 
-                    <tr key={issue.id}>
-
-                      <td>
-                        <strong>
-                          {issue.issue}
-                        </strong>
+                    <tr>
+                      <td colSpan="6">
+                        Loading issues...
                       </td>
-
-                      <td>
-                        {issue.category}
-                      </td>
-
-                      <td>
-                        {issue.location}
-                      </td>
-
-                      <td>
-
-                        <span
-                          className={`priority-${issue.priority.toLowerCase()}`}
-                        >
-                          {issue.priority}
-                        </span>
-
-                      </td>
-
-                      <td>
-
-                        <span
-                          className={`status ${issue.status
-                            .toLowerCase()
-                            .replace(" ", "-")}`}
-                        >
-                          {issue.status}
-                        </span>
-
-                      </td>
-
-                      <td>
-
-                        <Link
-                          to={`/admin/issues/${issue.id}`}
-                          className="view-link"
-                        >
-                          View
-                        </Link>
-
-                      </td>
-
                     </tr>
 
-                  ))}
+                  ) : recentIssues.length === 0 ? (
+
+                    <tr>
+                      <td colSpan="6">
+                        No issues found.
+                      </td>
+                    </tr>
+
+                  ) : (
+
+                    recentIssues.map((issue) => {
+
+                      const issueId = issue._id || issue.id;
+
+                      const issueTitle =
+                        issue.title ||
+                        issue.issue ||
+                        issue.name ||
+                        "Untitled Issue";
+
+                      const status = formatStatus(issue.status);
+
+                      const priority =
+                        issue.priority || "Medium";
+
+                      return (
+                        <tr key={issueId}>
+
+                          <td>
+                            <strong>
+                              {issueTitle}
+                            </strong>
+                          </td>
+
+                          <td>
+                            {issue.category || "—"}
+                          </td>
+
+                          <td>
+                            {issue.location || "—"}
+                          </td>
+
+                          <td>
+                            <span
+                              className={`priority-${String(
+                                priority
+                              ).toLowerCase()}`}
+                            >
+                              {priority}
+                            </span>
+                          </td>
+
+                          <td>
+                            <span
+                              className={`status ${String(status)
+                                .toLowerCase()
+                                .replace(/\s+/g, "-")}`}
+                            >
+                              {status}
+                            </span>
+                          </td>
+
+                          <td>
+                            <Link
+                              to={`/admin/issues/${issueId}`}
+                              className="view-link"
+                            >
+                              View
+                            </Link>
+                          </td>
+
+                        </tr>
+                      );
+                    })
+
+                  )}
 
                 </tbody>
 

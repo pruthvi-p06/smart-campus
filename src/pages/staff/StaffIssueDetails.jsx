@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import StaffSidebar from "../../components/StaffSidebar";
 import { getStaffIssue, updateIssueStatus } from "../../services/api";
+import { getImageUrl } from "../../utils/imageUrl";
 
 function StaffIssueDetails() {
   const { id } = useParams();
@@ -313,6 +314,21 @@ function StaffIssueDetails() {
                   </p>
 
                 </div>
+                {issue.image && (
+  <div className="issue-image-section">
+
+    <h3>
+      Uploaded Image
+    </h3>
+
+    <img
+      src={getImageUrl(issue.image)}
+      alt="Issue attachment"
+      className="issue-image"
+    />
+
+  </div>
+)}
 
               </section>
 

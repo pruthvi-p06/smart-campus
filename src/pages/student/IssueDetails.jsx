@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import DashboardLayout from "../../components/DashboardLayout";
 import { getIssue } from "../../services/api";
+import { getImageUrl } from "../../utils/imageUrl";
 
 function IssueDetails() {
   const { id } = useParams();
@@ -17,11 +18,17 @@ function IssueDetails() {
         setError("");
 
         const response = await getIssue(id);
-        const issueData = response.issue || response.data || response;
+        const issueData =
+          response.issue ||
+          response.data ||
+          response;
 
         setIssue(issueData);
       } catch (err) {
-        setError(err.message || "Failed to load issue details.");
+        setError(
+          err.message ||
+          "Failed to load issue details."
+        );
       } finally {
         setLoading(false);
       }
@@ -33,11 +40,14 @@ function IssueDetails() {
   const formatDate = (date) => {
     if (!date) return "—";
 
-    return new Date(date).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric"
-    });
+    return new Date(date).toLocaleDateString(
+      "en-GB",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric"
+      }
+    );
   };
 
   if (loading) {
@@ -53,6 +63,7 @@ function IssueDetails() {
   if (error || !issue) {
     return (
       <DashboardLayout>
+
         <Link
           to="/student/issues"
           className="back-link"
@@ -63,6 +74,7 @@ function IssueDetails() {
         <div className="error-message">
           ⚠ {error || "Issue not found."}
         </div>
+
       </DashboardLayout>
     );
   }
@@ -92,7 +104,9 @@ function IssueDetails() {
 
           <div className="details-title">
 
-            <h1>{issue.title}</h1>
+            <h1>
+              {issue.title || "Untitled Issue"}
+            </h1>
 
             <span
               className={`status ${status
@@ -125,21 +139,28 @@ function IssueDetails() {
 
             <div>
               <span>Category</span>
-              <strong>{issue.category || "—"}</strong>
+              <strong>
+                {issue.category || "—"}
+              </strong>
             </div>
 
             <div>
               <span>Location</span>
-              <strong>{issue.location || "—"}</strong>
+              <strong>
+                {issue.location || "—"}
+              </strong>
             </div>
 
             <div>
               <span>Department</span>
-              <strong>{issue.department || "—"}</strong>
+              <strong>
+                {issue.department || "—"}
+              </strong>
             </div>
 
             <div>
               <span>Priority</span>
+
               <strong
                 className={`priority-${priority.toLowerCase()}`}
               >
@@ -149,13 +170,18 @@ function IssueDetails() {
 
             <div>
               <span>Reported</span>
+
               <strong>
-                {formatDate(issue.createdAt || issue.reportedDate)}
+                {formatDate(
+                  issue.createdAt ||
+                  issue.reportedDate
+                )}
               </strong>
             </div>
 
             <div>
               <span>Assigned To</span>
+
               <strong>
                 {issue.assignedTo?.name ||
                   issue.assignedTo ||
@@ -166,15 +192,39 @@ function IssueDetails() {
           </div>
 
 
+          {/* Description */}
+
           <div className="description-section">
 
-            <h3>Description</h3>
+            <h3>
+              Description
+            </h3>
 
             <p>
-              {issue.description || "No description provided."}
+              {issue.description ||
+                "No description provided."}
             </p>
 
           </div>
+
+
+          {/* Uploaded Image */}
+
+          {issue.image && (
+            <div className="issue-image-section">
+
+              <h3>
+                Uploaded Image
+              </h3>
+
+              <img
+                src={getImageUrl(issue.image)}
+                alt="Issue attachment"
+                className="issue-image"
+              />
+
+            </div>
+          )}
 
         </div>
 
@@ -194,9 +244,15 @@ function IssueDetails() {
               </div>
 
               <div>
-                <strong>Issue Reported</strong>
+                <strong>
+                  Issue Reported
+                </strong>
+
                 <p>
-                  {formatDate(issue.createdAt || issue.reportedDate)}
+                  {formatDate(
+                    issue.createdAt ||
+                    issue.reportedDate
+                  )}
                 </p>
               </div>
 
@@ -205,21 +261,30 @@ function IssueDetails() {
 
             <div
               className={`timeline-item ${
-                issue.assignedTo ? "completed" : ""
+                issue.assignedTo
+                  ? "completed"
+                  : ""
               }`}
             >
 
               <div className="timeline-dot">
-                {issue.assignedTo ? "✓" : "2"}
+                {issue.assignedTo
+                  ? "✓"
+                  : "2"}
               </div>
 
               <div>
-                <strong>Issue Assigned</strong>
+
+                <strong>
+                  Issue Assigned
+                </strong>
+
                 <p>
                   {issue.assignedTo
                     ? "Assigned to staff"
                     : "Pending assignment"}
                 </p>
+
               </div>
 
             </div>
@@ -227,16 +292,26 @@ function IssueDetails() {
 
             <div
               className={`timeline-item ${
-                status === "In Progress" ? "current" : ""
+                status === "In Progress"
+                  ? "current"
+                  : ""
               }`}
             >
 
               <div className="timeline-dot">
-                {status === "In Progress" ? "•" : "3"}
+
+                {status === "In Progress"
+                  ? "•"
+                  : "3"}
+
               </div>
 
               <div>
-                <strong>In Progress</strong>
+
+                <strong>
+                  In Progress
+                </strong>
+
                 <p>
                   {status === "In Progress"
                     ? "Staff is working on the issue."
@@ -244,6 +319,7 @@ function IssueDetails() {
                     ? "Issue has been resolved."
                     : "Pending"}
                 </p>
+
               </div>
 
             </div>
@@ -251,21 +327,32 @@ function IssueDetails() {
 
             <div
               className={`timeline-item ${
-                status === "Resolved" ? "completed" : ""
+                status === "Resolved"
+                  ? "completed"
+                  : ""
               }`}
             >
 
               <div className="timeline-dot">
-                {status === "Resolved" ? "✓" : "4"}
+
+                {status === "Resolved"
+                  ? "✓"
+                  : "4"}
+
               </div>
 
               <div>
-                <strong>Resolved</strong>
+
+                <strong>
+                  Resolved
+                </strong>
+
                 <p>
                   {status === "Resolved"
                     ? formatDate(issue.resolvedAt)
                     : "Pending"}
                 </p>
+
               </div>
 
             </div>
@@ -279,7 +366,9 @@ function IssueDetails() {
 
         <div className="details-card resolution-card">
 
-          <h2>Resolution / Staff Update</h2>
+          <h2>
+            Resolution / Staff Update
+          </h2>
 
           <p>
             {issue.resolution ||
