@@ -1,6 +1,16 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
 function StaffSidebar() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    navigate("/login", { replace: true });
+  };
+
   return (
     <aside className="sidebar">
 
@@ -24,13 +34,32 @@ function StaffSidebar() {
 
       <div className="sidebar-bottom">
 
+        <NotificationBell />
+
         <NavLink to="/staff/profile">
           Profile
         </NavLink>
 
-        <NavLink to="/login">
-          Logout
-        </NavLink>
+        <button
+  type="button"
+  onClick={handleLogout}
+  className="sidebar-logout"
+  style={{
+    color: "#ffffff",
+    background: "transparent",
+    border: "none",
+    fontSize: "16px",
+    fontWeight: "500",
+    cursor: "pointer",
+    textAlign: "left",
+    width: "100%",
+    padding: "12px 0",
+    display: "block",
+    opacity: 1
+  }}
+>
+  Logout
+</button>
 
       </div>
 

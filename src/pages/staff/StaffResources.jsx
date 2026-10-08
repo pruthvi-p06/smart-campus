@@ -1,91 +1,119 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import StaffSidebar from "../../components/StaffSidebar";
+import { getResources } from "../../services/api";
 
 function StaffResources() {
 
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
 
-  const resources = [
-    {
-      id: 1,
-      name: "Central Library",
-      category: "Academic",
-      location: "Main Block",
-      status: "Open",
-      icon: "📚",
-      description:
-        "Library with textbooks, reference materials and study spaces."
-    },
-    {
-      id: 2,
-      name: "Computer Lab 3",
-      category: "Laboratory",
-      location: "Block A",
-      status: "Available",
-      icon: "💻",
-      description:
-        "Computer laboratory available for academic and project work."
-    },
-    {
-      id: 3,
-      name: "Seminar Hall",
-      category: "Facility",
-      location: "Block B",
-      status: "Available",
-      icon: "🏢",
-      description:
-        "Large hall for seminars, presentations and academic events."
-    },
-    {
-      id: 4,
-      name: "Innovation Lab",
-      category: "Laboratory",
-      location: "Block C",
-      status: "Available",
-      icon: "🔬",
-      description:
-        "Dedicated space for innovation, research and student projects."
-    },
-    {
-      id: 5,
-      name: "Sports Ground",
-      category: "Sports",
-      location: "East Campus",
-      status: "Open",
-      icon: "🏟️",
-      description:
-        "Outdoor sports facility available for students and staff."
-    },
-    {
-      id: 6,
-      name: "Auditorium",
-      category: "Facility",
-      location: "Main Block",
-      status: "Available",
-      icon: "🎭",
-      description:
-        "Auditorium for college events, talks and cultural programs."
-    }
-  ];
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+
+    const fetchResources = async () => {
+
+      try {
+
+        setLoading(true);
+        setError("");
+
+        const response = await getResources();
+
+        const resourceData =
+          response?.resources ||
+          response?.data ||
+          response ||
+          [];
+
+        setResources(
+          Array.isArray(resourceData)
+            ? resourceData
+            : []
+        );
+
+      } catch (err) {
+
+        console.error("Failed to load resources:", err);
+
+        setError(
+          err.message ||
+          "Failed to load campus resources."
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+    };
+
+    fetchResources();
+
+  }, []);
 
 
   const filteredResources = resources.filter((resource) => {
 
     const searchText = search.toLowerCase();
 
+    const name =
+      resource.name ||
+      resource.title ||
+      "";
+
+    const resourceCategory =
+      resource.category ||
+      "";
+
+    const location =
+      resource.location ||
+      "";
+
     const matchesSearch =
-      resource.name.toLowerCase().includes(searchText) ||
-      resource.category.toLowerCase().includes(searchText) ||
-      resource.location.toLowerCase().includes(searchText);
+      name.toLowerCase().includes(searchText) ||
+      resourceCategory.toLowerCase().includes(searchText) ||
+      location.toLowerCase().includes(searchText);
 
     const matchesCategory =
       category === "All" ||
-      resource.category === category;
+      resourceCategory === category;
 
     return matchesSearch && matchesCategory;
   });
+
+
+  const categories = [
+    ...new Set(
+      resources
+        .map((resource) => resource.category)
+        .filter(Boolean)
+    )
+  ];
+
+
+  const getIcon = (category) => {
+
+    switch (category) {
+      case "Academic":
+        return "📚";
+
+      case "Laboratory":
+        return "💻";
+
+      case "Sports":
+        return "🏟️";
+
+      case "Facility":
+        return "🏢";
+
+      default:
+        return "🏫";
+    }
+  };
 
 
   return (
@@ -123,7 +151,9 @@ function StaffResources() {
 
             <div>
 
-              <h1>Campus Resources</h1>
+              <h1>
+                Campus Resources
+              </h1>
 
               <p>
                 Find and view available campus facilities and resources.
@@ -132,6 +162,13 @@ function StaffResources() {
             </div>
 
           </div>
+
+
+          {error && (
+            <div className="error-message">
+              {error}
+            </div>
+          )}
 
 
           {/* Search and Filter */}
@@ -146,7 +183,9 @@ function StaffResources() {
                 type="text"
                 placeholder="Search resources..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
               />
 
             </div>
@@ -160,28 +199,25 @@ function StaffResources() {
 
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) =>
+                  setCategory(e.target.value)
+                }
               >
 
                 <option value="All">
                   All
                 </option>
 
-                <option value="Academic">
-                  Academic
-                </option>
+                {categories.map((item) => (
 
-                <option value="Laboratory">
-                  Laboratory
-                </option>
+                  <option
+                    key={item}
+                    value={item}
+                  >
+                    {item}
+                  </option>
 
-                <option value="Facility">
-                  Facility
-                </option>
-
-                <option value="Sports">
-                  Sports
-                </option>
+                ))}
 
               </select>
 
@@ -194,8 +230,10 @@ function StaffResources() {
 
           <div className="resource-count">
 
-            Showing {filteredResources.length} of{" "}
-            {resources.length} resources
+            {loading
+              ? "Loading resources..."
+              : `Showing ${filteredResources.length} of ${resources.length} resources`
+            }
 
           </div>
 
@@ -204,53 +242,97 @@ function StaffResources() {
 
           <div className="resource-grid">
 
-            {filteredResources.length > 0 ? (
+            {loading ? (
 
-              filteredResources.map((resource) => (
+              <div className="no-resources">
 
-                <div
-                  className="resource-card"
-                  key={resource.id}
-                >
-
-                  <div className="resource-card-top">
-
-                    <div className="resource-icon">
-                      {resource.icon}
-                    </div>
-
-                    <span className="resource-status">
-                      {resource.status}
-                    </span>
-
-                  </div>
-
-
-                  <h2>
-                    {resource.name}
-                  </h2>
-
-
-                  <p>
-                    {resource.description}
-                  </p>
-
-
-                  <div className="resource-card-footer">
-
-                    <span>
-                      📁 {resource.category}
-                    </span>
-
-                    <span>
-                      📍 {resource.location}
-                    </span>
-
-                  </div>
-
+                <div>
+                  ⏳
                 </div>
 
-              ))
+                <h2>
+                  Loading resources...
+                </h2>
+
+              </div>
+
+            ) : filteredResources.length > 0 ? (
+
+              filteredResources.map((resource) => {
+
+                const resourceId =
+                  resource._id ||
+                  resource.id;
+
+                const name =
+                  resource.name ||
+                  resource.title ||
+                  "Unnamed Resource";
+
+                const resourceCategory =
+                  resource.category ||
+                  "General";
+
+                const location =
+                  resource.location ||
+                  "—";
+
+                const status =
+                  resource.status ||
+                  "Available";
+
+                const description =
+                  resource.description ||
+                  "Campus resource available for students and staff.";
+
+                return (
+
+                  <div
+                    className="resource-card"
+                    key={resourceId}
+                  >
+
+                    <div className="resource-card-top">
+
+                      <div className="resource-icon">
+                        {resource.icon ||
+                          getIcon(resourceCategory)}
+                      </div>
+
+                      <span className="resource-status">
+                        {status}
+                      </span>
+
+                    </div>
+
+
+                    <h2>
+                      {name}
+                    </h2>
+
+
+                    <p>
+                      {description}
+                    </p>
+
+
+                    <div className="resource-card-footer">
+
+                      <span>
+                        📁 {resourceCategory}
+                      </span>
+
+                      <span>
+                        📍 {location}
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                );
+
+              })
 
             ) : (
 

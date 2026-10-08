@@ -1,15 +1,22 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
 function AdminSidebar() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    navigate("/login", { replace: true });
+  };
 
   return (
-
     <aside className="sidebar">
 
       <h2 className="sidebar-logo">
         SmartCampus
       </h2>
-
 
       <nav className="sidebar-nav">
 
@@ -35,18 +42,36 @@ function AdminSidebar() {
 
       </nav>
 
-
       <nav className="sidebar-bottom">
 
-        <NavLink to="/admin/profile">
-          Profile
-        </NavLink>
+  <NotificationBell />
 
-        <NavLink to="/login">
-          Logout
-        </NavLink>
+  <NavLink to="/admin/profile">
+    Profile
+  </NavLink>
 
-      </nav>
+  <button
+  type="button"
+  onClick={handleLogout}
+  className="sidebar-logout"
+  style={{
+    color: "#ffffff",
+    background: "transparent",
+    border: "none",
+    fontSize: "16px",
+    fontWeight: "500",
+    cursor: "pointer",
+    textAlign: "left",
+    width: "100%",
+    padding: "12px 0",
+    display: "block",
+    opacity: 1
+  }}
+>
+  Logout
+</button>
+
+</nav>
 
     </aside>
   );

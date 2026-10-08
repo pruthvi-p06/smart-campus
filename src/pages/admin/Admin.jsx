@@ -1,9 +1,11 @@
+import { getImageUrl } from "../../utils/imageUrl";
 import { useEffect, useState } from "react";
 import {
   Link,
   NavLink,
   useNavigate,
-  useParams
+  useParams,
+  useLocation
 } from "react-router-dom";
 import {
   getAdminIssues,
@@ -546,16 +548,31 @@ function AdminIssueDetails() {
 
             <div className="description-section">
 
-              <h3>
-                Description
-              </h3>
+  <h3>
+    Description
+  </h3>
 
-              <p>
-                {issue?.description ||
-                  "No description provided."}
-              </p>
+  <p>
+    {issue?.description ||
+      "No description provided."}
+  </p>
 
-            </div>
+</div>
+{issue?.image && (
+  <div className="issue-image-section">
+
+    <h3>
+      Uploaded Image
+    </h3>
+
+    <img
+      src={getImageUrl(issue.image)}
+      alt="Issue attachment"
+      className="issue-image"
+    />
+
+  </div>
+)}
 
           </section>
 
@@ -1243,286 +1260,403 @@ function AdminUsers() {
 ========================================================= */
 
 function AdminResources() {
-
-  const [resources, setResources] = useState([
-
-    {
-      id: 1,
-      name: "Central Library",
-      category: "Academic",
-      location: "Main Block",
-      status: "Open"
-    },
-
-    {
-      id: 2,
-      name: "Computer Lab 3",
-      category: "Laboratory",
-      location: "Block A",
-      status: "Available"
-    },
-
-    {
-      id: 3,
-      name: "Seminar Hall",
-      category: "Facility",
-      location: "Block B",
-      status: "Available"
-    },
-
-    {
-      id: 4,
-      name: "Innovation Lab",
-      category: "Laboratory",
-      location: "Block C",
-      status: "Available"
-    }
-
-  ]);
-
+  const [resources, setResources] = useState([]);
 
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Academic");
   const [location, setLocation] = useState("");
+  const [status, setStatus] = useState("Available");
 
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const addResource = (e) => {
+  const fetchResources = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-    e.preventDefault();
+      const response = await getResources();
 
-    if (!name || !location) {
-      return;
+      const resourceList =
+        response?.resources ||
+        response?.data ||
+        response ||
+        [];
+
+      setResources(
+        Array.isArray(resourceList)
+          ? resourceList
+          : []
+      );
+    } catch (err) {
+      setError(
+        err.message || "Failed to load resources."
+      );
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const newResource = {
+  useEffect(() => {
+    fetchResources();
+  }, []);
 
-      id: resources.length + 1,
-
-      name,
-
-      category,
-
-      location,
-
-      status: "Available"
-
-    };
-
-
-    setResources([
-      ...resources,
-      newResource
-    ]);
-
+  const resetForm = () => {
     setName("");
+    setCategory("Academic");
     setLocation("");
-
+    setStatus("Available");
+    setEditingId(null);
     setShowForm(false);
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!name.trim() || !location.trim()) {
+      setError("Name and location are required.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      const resourceData = {
+        name: name.trim(),
+        category,
+        location: location.trim(),
+        status
+      };
+
+      if (editingId) {
+        await updateResource(
+          editingId,
+          resourceData
+        );
+      } else {
+        await createResource(resourceData);
+      }
+
+      await fetchResources();
+      resetForm();
+
+    } catch (err) {
+      setError(
+        err.message ||
+        "Failed to save resource."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEdit = (resource) => {
+    setEditingId(resource._id || resource.id);
+    setName(resource.name || "");
+    setCategory(resource.category || "Academic");
+    setLocation(resource.location || "");
+    setStatus(resource.status || "Available");
+    setShowForm(true);
+    setError("");
+  };
+
+  const handleDelete = async (resourceId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this resource?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setError("");
+
+      await deleteResource(resourceId);
+
+      await fetchResources();
+
+    } catch (err) {
+      setError(
+        err.message ||
+        "Failed to delete resource."
+      );
+    }
+  };
 
   return (
     <AdminLayout>
 
       <div className="page-content">
 
-        <div className="page-header admin-resource-header">
+        <div className="page-header">
 
           <div>
-
-            <h1>
-              Resource Management
-            </h1>
+            <h1>Campus Resources</h1>
 
             <p>
-              Add and manage campus facilities and resources.
+              Add, update and manage campus resources.
             </p>
-
           </div>
 
-
           <button
+            type="button"
             className="primary-button"
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
           >
             + Add Resource
           </button>
 
         </div>
 
-
-        {/* ADD RESOURCE FORM */}
+        {error && (
+          <div className="error-message">
+            ⚠ {error}
+          </div>
+        )}
 
         {showForm && (
-
-          <section className="detail-card">
+          <section className="form-card">
 
             <h2>
-              Add New Resource
+              {editingId
+                ? "Edit Resource"
+                : "Add Resource"}
             </h2>
 
-            <form onSubmit={addResource}>
+            <form onSubmit={handleSubmit}>
 
-              <div className="profile-form-grid">
+              <div className="form-group">
 
-                <div className="profile-form-group">
+                <label>
+                  Resource Name
+                </label>
 
-                  <label>
-                    Resource Name
-                  </label>
-
-                  <input
-                    type="text"
-                    placeholder="Enter resource name"
-                    value={name}
-                    onChange={(e) =>
-                      setName(e.target.value)
-                    }
-                  />
-
-                </div>
-
-
-                <div className="profile-form-group">
-
-                  <label>
-                    Category
-                  </label>
-
-                  <select
-                    value={category}
-                    onChange={(e) =>
-                      setCategory(e.target.value)
-                    }
-                  >
-
-                    <option>
-                      Academic
-                    </option>
-
-                    <option>
-                      Laboratory
-                    </option>
-
-                    <option>
-                      Facility
-                    </option>
-
-                    <option>
-                      Sports
-                    </option>
-
-                  </select>
-
-                </div>
-
-
-                <div className="profile-form-group">
-
-                  <label>
-                    Location
-                  </label>
-
-                  <input
-                    type="text"
-                    placeholder="Enter location"
-                    value={location}
-                    onChange={(e) =>
-                      setLocation(e.target.value)
-                    }
-                  />
-
-                </div>
+                <input
+                  value={name}
+                  onChange={(e) =>
+                    setName(e.target.value)
+                  }
+                  placeholder="Example: Central Library"
+                />
 
               </div>
 
+              <div className="form-group">
 
-              <button
-                type="submit"
-                className="save-profile-button"
-              >
-                Add Resource
-              </button>
+                <label>
+                  Category
+                </label>
+
+                <select
+                  value={category}
+                  onChange={(e) =>
+                    setCategory(e.target.value)
+                  }
+                >
+                  <option value="Academic">
+                    Academic
+                  </option>
+
+                  <option value="Laboratory">
+                    Laboratory
+                  </option>
+
+                  <option value="Facility">
+                    Facility
+                  </option>
+
+                  <option value="Sports">
+                    Sports
+                  </option>
+
+                  <option value="Other">
+                    Other
+                  </option>
+                </select>
+
+              </div>
+
+              <div className="form-group">
+
+                <label>
+                  Location
+                </label>
+
+                <input
+                  value={location}
+                  onChange={(e) =>
+                    setLocation(e.target.value)
+                  }
+                  placeholder="Example: Main Block"
+                />
+
+              </div>
+
+              <div className="form-group">
+
+                <label>
+                  Status
+                </label>
+
+                <select
+                  value={status}
+                  onChange={(e) =>
+                    setStatus(e.target.value)
+                  }
+                >
+                  <option value="Available">
+                    Available
+                  </option>
+
+                  <option value="Open">
+                    Open
+                  </option>
+
+                  <option value="Closed">
+                    Closed
+                  </option>
+
+                  <option value="Maintenance">
+                    Maintenance
+                  </option>
+                </select>
+
+              </div>
+
+              <div className="form-actions">
+
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={saving}
+                >
+                  {saving
+                    ? "Saving..."
+                    : editingId
+                    ? "Update Resource"
+                    : "Add Resource"}
+                </button>
+
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={resetForm}
+                >
+                  Cancel
+                </button>
+
+              </div>
 
             </form>
 
           </section>
-
         )}
 
+        {loading ? (
 
-        {/* RESOURCE TABLE */}
+          <div className="no-resources">
+            <h2>Loading resources...</h2>
+          </div>
 
-        <div className="table-card">
+        ) : resources.length === 0 ? (
 
-          <table>
+          <div className="no-resources">
+            <h2>No resources found</h2>
+            <p>Add your first campus resource.</p>
+          </div>
 
-            <thead>
+        ) : (
 
-              <tr>
-                <th>Resource</th>
-                <th>Category</th>
-                <th>Location</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
+          <div className="resource-grid">
 
-            </thead>
+            {resources.map((resource) => {
 
-            <tbody>
+              const resourceId =
+                resource._id || resource.id;
 
-              {resources.map((resource) => (
+              return (
+                <div
+                  className="resource-card"
+                  key={resourceId}
+                >
 
-                <tr key={resource.id}>
+                  <div className="resource-card-top">
 
-                  <td>
-                    <strong>
-                      {resource.name}
-                    </strong>
-                  </td>
+                    <div className="resource-icon">
+                      🏫
+                    </div>
 
-                  <td>
-                    {resource.category}
-                  </td>
-
-                  <td>
-                    {resource.location}
-                  </td>
-
-                  <td>
-
-                    <span className="status resolved">
-                      {resource.status}
+                    <span className="resource-status">
+                      {resource.status || "Available"}
                     </span>
 
-                  </td>
+                  </div>
 
-                  <td>
+                  <h2>
+                    {resource.name || "Unnamed Resource"}
+                  </h2>
 
-                    <button className="text-button">
+                  <p>
+                    {resource.description ||
+                      "Campus resource"}
+                  </p>
+
+                  <div className="resource-card-footer">
+
+                    <span>
+                      📁 {resource.category || "General"}
+                    </span>
+
+                    <span>
+                      📍 {resource.location || "—"}
+                    </span>
+
+                  </div>
+
+                  <div className="resource-actions">
+
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() =>
+                        handleEdit(resource)
+                      }
+                    >
                       Edit
                     </button>
 
-                  </td>
+                    <button
+                      type="button"
+                      className="text-button danger"
+                      onClick={() =>
+                        handleDelete(resourceId)
+                      }
+                    >
+                      Delete
+                    </button>
 
-                </tr>
+                  </div>
 
-              ))}
+                </div>
+              );
+            })}
 
-            </tbody>
+          </div>
 
-          </table>
-
-        </div>
+        )}
 
       </div>
 
     </AdminLayout>
   );
 }
-
 
 /* =========================================================
    ANALYTICS
@@ -2177,10 +2311,9 @@ function AdminProfile() {
 /* =========================================================
    MAIN ADMIN ROUTER
 ========================================================= */
-
 function Admin() {
-
-  const path = window.location.pathname;
+  const location = useLocation();
+  const path = location.pathname;
 
 
   if (path === "/admin/dashboard") {
