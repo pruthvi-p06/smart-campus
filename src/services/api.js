@@ -1,5 +1,5 @@
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+  "https://turbo-system-x9wrjp7v96c97g4-5000.app.github.dev/api";
 
 const request = async (endpoint, options = {}) => {
   const token = localStorage.getItem("token");
