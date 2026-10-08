@@ -264,12 +264,21 @@ const updateAdminIssue = async (req, res) => {
         issue.assignedTo = null;
         issue.assignedAt = null;
       } else {
-        assignedStaffUser = await User.findById(assignedTo);
+        assignedStaffUser = await User.findOne({
+          _id: assignedTo,
+          role: 'staff',
+          status: 'active',
+        });
+
         if (!assignedStaffUser) {
-          return res.status(400).json({ message: 'Assigned staff user not found' });
+          return res.status(400).json({
+            message: 'Assigned user must be an active staff member',
+          });
         }
+
         issue.assignedTo = assignedStaffUser._id;
         issue.assignedAt = new Date();
+
         if (issue.status === 'Pending') {
           issue.status = 'In Progress'; // Auto advance status upon assignment
         }
