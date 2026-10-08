@@ -1,43 +1,164 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import StaffSidebar from "../../components/StaffSidebar";
+import { getStaffIssue, updateIssueStatus } from "../../services/api";
 
 function StaffIssueDetails() {
-
   const { id } = useParams();
 
-  // Temporary frontend data
-  const issue = {
-    id: id,
-    title: "WiFi not working",
-    category: "Network",
-    location: "Lab 3",
-    department: "CSE-AIML",
-    priority: "High",
-    status: "In Progress",
-    reported: "16 Sept 2026",
-    assignedTo: "Campus Network Staff",
-    description:
-      "The WiFi connection is not working properly in Lab 3. Students are unable to access the internet during laboratory sessions."
-  };
-
-  const [status, setStatus] = useState(issue.status);
+  const [issue, setIssue] = useState(null);
+  const [status, setStatus] = useState("");
   const [staffUpdate, setStaffUpdate] = useState("");
   const [resolutionDetails, setResolutionDetails] = useState("");
+
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  useEffect(() => {
+    const fetchIssue = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-  const handleUpdate = (e) => {
+        const response = await getStaffIssue(id);
 
-    e.preventDefault();
+        const issueData =
+          response.issue ||
+          response.data ||
+          response;
 
-    setSuccessMessage("Issue updated successfully!");
+        setIssue(issueData);
+        setStatus(issueData.status || "Pending");
 
+        setStaffUpdate(
+          issueData.staffUpdate ||
+          issueData.updateNotes ||
+          ""
+        );
+
+        setResolutionDetails(
+          issueData.resolution ||
+          issueData.resolutionNotes ||
+          ""
+        );
+      } catch (err) {
+        setError(
+          err.message || "Failed to load issue details."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIssue();
+  }, [id]);
+
+  const formatDate = (date) => {
+    if (!date) return "—";
+
+    return new Date(date).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
   };
 
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+
+    try {
+      setUpdating(true);
+      setError("");
+      setSuccessMessage("");
+
+      const response = await updateIssueStatus(id, {
+        status,
+        staffUpdate,
+        resolutionDetails
+      });
+
+      const updatedIssue =
+        response.issue ||
+        response.data ||
+        response;
+
+      setIssue((prevIssue) => ({
+        ...prevIssue,
+        ...(updatedIssue || {}),
+        status
+      }));
+
+      setSuccessMessage("Issue updated successfully!");
+    } catch (err) {
+      setError(
+        err.message || "Failed to update the issue."
+      );
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="dashboard-layout">
+
+        <StaffSidebar />
+
+        <main className="main-content">
+
+          <div className="page-content staff-detail-page">
+
+            <div className="no-issues">
+              <h2>Loading issue details...</h2>
+            </div>
+
+          </div>
+
+        </main>
+
+      </div>
+    );
+  }
+
+  if (error || !issue) {
+    return (
+      <div className="dashboard-layout">
+
+        <StaffSidebar />
+
+        <main className="main-content">
+
+          <div className="page-content staff-detail-page">
+
+            <Link
+              to="/staff/issues"
+              className="back-link"
+            >
+              ← Back to Assigned Issues
+            </Link>
+
+            <div className="error-message">
+              ⚠ {error || "Issue not found."}
+            </div>
+
+          </div>
+
+        </main>
+
+      </div>
+    );
+  }
+
+  const issueId = issue._id || issue.id;
+  const priority = issue.priority || "Medium";
+  const assignedTo =
+    issue.assignedTo?.name ||
+    issue.assignedTo ||
+    "Not assigned";
 
   return (
-
     <div className="dashboard-layout">
 
       <StaffSidebar />
@@ -85,12 +206,14 @@ function StaffIssueDetails() {
 
               <div className="detail-title-row">
 
-                <h1>{issue.title}</h1>
+                <h1>
+                  {issue.title || "Untitled Issue"}
+                </h1>
 
                 <span
                   className={`status ${status
                     .toLowerCase()
-                    .replace(" ", "-")}`}
+                    .replace(/\s+/g, "-")}`}
                 >
                   {status}
                 </span>
@@ -98,7 +221,7 @@ function StaffIssueDetails() {
               </div>
 
               <p>
-                Issue #{issue.id}
+                Issue #{issueId}
               </p>
 
             </div>
@@ -126,38 +249,55 @@ function StaffIssueDetails() {
 
                   <div>
                     <span>Category</span>
-                    <strong>{issue.category}</strong>
+                    <strong>
+                      {issue.category || "—"}
+                    </strong>
                   </div>
 
                   <div>
                     <span>Location</span>
-                    <strong>{issue.location}</strong>
+                    <strong>
+                      {issue.location || "—"}
+                    </strong>
                   </div>
 
                   <div>
                     <span>Department</span>
-                    <strong>{issue.department}</strong>
+                    <strong>
+                      {issue.department || "—"}
+                    </strong>
                   </div>
 
                   <div>
                     <span>Priority</span>
 
                     <strong
-                      className={`priority-${issue.priority.toLowerCase()}`}
+                      className={`priority-${priority.toLowerCase()}`}
                     >
-                      {issue.priority}
+                      {priority}
                     </strong>
 
                   </div>
 
                   <div>
                     <span>Reported</span>
-                    <strong>{issue.reported}</strong>
+
+                    <strong>
+                      {formatDate(
+                        issue.createdAt ||
+                        issue.reportedDate
+                      )}
+                    </strong>
+
                   </div>
 
                   <div>
                     <span>Assigned To</span>
-                    <strong>{issue.assignedTo}</strong>
+
+                    <strong>
+                      {assignedTo}
+                    </strong>
+
                   </div>
 
                 </div>
@@ -168,7 +308,8 @@ function StaffIssueDetails() {
                   <h3>Description</h3>
 
                   <p>
-                    {issue.description}
+                    {issue.description ||
+                      "No description provided."}
                   </p>
 
                 </div>
@@ -197,6 +338,7 @@ function StaffIssueDetails() {
                       onChange={(e) => {
                         setStatus(e.target.value);
                         setSuccessMessage("");
+                        setError("");
                       }}
                     >
 
@@ -230,6 +372,7 @@ function StaffIssueDetails() {
                       onChange={(e) => {
                         setStaffUpdate(e.target.value);
                         setSuccessMessage("");
+                        setError("");
                       }}
                       placeholder="Describe the work or progress made..."
                       rows="4"
@@ -251,12 +394,22 @@ function StaffIssueDetails() {
                       onChange={(e) => {
                         setResolutionDetails(e.target.value);
                         setSuccessMessage("");
+                        setError("");
                       }}
                       placeholder="Enter how the issue was resolved..."
                       rows="4"
                     />
 
                   </div>
+
+
+                  {error && (
+
+                    <div className="error-message">
+                      ⚠ {error}
+                    </div>
+
+                  )}
 
 
                   {successMessage && (
@@ -273,8 +426,11 @@ function StaffIssueDetails() {
                   <button
                     type="submit"
                     className="update-issue-button"
+                    disabled={updating}
                   >
-                    Update Issue
+                    {updating
+                      ? "Updating..."
+                      : "Update Issue"}
                   </button>
 
                 </form>
@@ -287,6 +443,7 @@ function StaffIssueDetails() {
             {/* RIGHT SIDE */}
 
             <div>
+
 
               {/* Progress */}
 
@@ -311,7 +468,10 @@ function StaffIssueDetails() {
                       </strong>
 
                       <span>
-                        {issue.reported}
+                        {formatDate(
+                          issue.createdAt ||
+                          issue.reportedDate
+                        )}
                       </span>
 
                     </div>
@@ -319,10 +479,16 @@ function StaffIssueDetails() {
                   </div>
 
 
-                  <div className="timeline-item completed">
+                  <div
+                    className={`timeline-item ${
+                      issue.assignedTo
+                        ? "completed"
+                        : ""
+                    }`}
+                  >
 
                     <div className="timeline-icon">
-                      ✓
+                      {issue.assignedTo ? "✓" : "2"}
                     </div>
 
                     <div>
@@ -332,7 +498,9 @@ function StaffIssueDetails() {
                       </strong>
 
                       <span>
-                        {issue.reported}
+                        {issue.assignedTo
+                          ? "Assigned to staff"
+                          : "Pending assignment"}
                       </span>
 
                     </div>
@@ -395,7 +563,7 @@ function StaffIssueDetails() {
 
                       <span>
                         {status === "Resolved"
-                          ? "Issue has been resolved."
+                          ? formatDate(issue.resolvedAt)
                           : "Pending"}
                       </span>
 
@@ -415,9 +583,9 @@ function StaffIssueDetails() {
                 <h2>Issue Priority</h2>
 
                 <div
-                  className={`large-priority priority-${issue.priority.toLowerCase()}`}
+                  className={`large-priority priority-${priority.toLowerCase()}`}
                 >
-                  {issue.priority}
+                  {priority}
                 </div>
 
                 <p>

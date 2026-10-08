@@ -1,25 +1,75 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import DashboardLayout from "../../components/DashboardLayout";
+import { getIssue } from "../../services/api";
 
 function IssueDetails() {
-
   const { id } = useParams();
 
-  const issue = {
-    id: id,
-    title: "WiFi not working",
-    category: "Network",
-    location: "Lab 3",
-    department: "CSE-AIML",
-    priority: "High",
-    status: "In Progress",
-    reportedDate: "16 Sept 2026",
-    description:
-      "The WiFi connection is not working properly in Lab 3. Students are unable to access the internet during laboratory sessions.",
-    assignedTo: "Campus Network Staff",
-    resolution:
-      "Network team is currently checking the router and connectivity."
+  const [issue, setIssue] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchIssue = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await getIssue(id);
+        const issueData = response.issue || response.data || response;
+
+        setIssue(issueData);
+      } catch (err) {
+        setError(err.message || "Failed to load issue details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIssue();
+  }, [id]);
+
+  const formatDate = (date) => {
+    if (!date) return "—";
+
+    return new Date(date).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="no-issues">
+          <h2>Loading issue details...</h2>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !issue) {
+    return (
+      <DashboardLayout>
+        <Link
+          to="/student/issues"
+          className="back-link"
+        >
+          ← Back to My Issues
+        </Link>
+
+        <div className="error-message">
+          ⚠ {error || "Issue not found."}
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const issueId = issue._id || issue.id;
+  const status = issue.status || "Pending";
+  const priority = issue.priority || "Medium";
 
   return (
     <DashboardLayout>
@@ -45,17 +95,17 @@ function IssueDetails() {
             <h1>{issue.title}</h1>
 
             <span
-              className={`status ${issue.status
+              className={`status ${status
                 .toLowerCase()
-                .replace(" ", "-")}`}
+                .replace(/\s+/g, "-")}`}
             >
-              {issue.status}
+              {status}
             </span>
 
           </div>
 
           <p>
-            Issue #{issue.id}
+            Issue #{issueId}
           </p>
 
         </div>
@@ -75,34 +125,42 @@ function IssueDetails() {
 
             <div>
               <span>Category</span>
-              <strong>{issue.category}</strong>
+              <strong>{issue.category || "—"}</strong>
             </div>
 
             <div>
               <span>Location</span>
-              <strong>{issue.location}</strong>
+              <strong>{issue.location || "—"}</strong>
             </div>
 
             <div>
               <span>Department</span>
-              <strong>{issue.department}</strong>
+              <strong>{issue.department || "—"}</strong>
             </div>
 
             <div>
               <span>Priority</span>
-              <strong className="priority-high">
-                {issue.priority}
+              <strong
+                className={`priority-${priority.toLowerCase()}`}
+              >
+                {priority}
               </strong>
             </div>
 
             <div>
               <span>Reported</span>
-              <strong>{issue.reportedDate}</strong>
+              <strong>
+                {formatDate(issue.createdAt || issue.reportedDate)}
+              </strong>
             </div>
 
             <div>
               <span>Assigned To</span>
-              <strong>{issue.assignedTo}</strong>
+              <strong>
+                {issue.assignedTo?.name ||
+                  issue.assignedTo ||
+                  "Not assigned"}
+              </strong>
             </div>
 
           </div>
@@ -113,7 +171,7 @@ function IssueDetails() {
             <h3>Description</h3>
 
             <p>
-              {issue.description}
+              {issue.description || "No description provided."}
             </p>
 
           </div>
@@ -137,49 +195,77 @@ function IssueDetails() {
 
               <div>
                 <strong>Issue Reported</strong>
-                <p>16 Sept 2026</p>
+                <p>
+                  {formatDate(issue.createdAt || issue.reportedDate)}
+                </p>
               </div>
 
             </div>
 
 
-            <div className="timeline-item completed">
+            <div
+              className={`timeline-item ${
+                issue.assignedTo ? "completed" : ""
+              }`}
+            >
 
               <div className="timeline-dot">
-                ✓
+                {issue.assignedTo ? "✓" : "2"}
               </div>
 
               <div>
                 <strong>Issue Assigned</strong>
-                <p>16 Sept 2026</p>
+                <p>
+                  {issue.assignedTo
+                    ? "Assigned to staff"
+                    : "Pending assignment"}
+                </p>
               </div>
 
             </div>
 
 
-            <div className="timeline-item current">
+            <div
+              className={`timeline-item ${
+                status === "In Progress" ? "current" : ""
+              }`}
+            >
 
               <div className="timeline-dot">
-                •
+                {status === "In Progress" ? "•" : "3"}
               </div>
 
               <div>
                 <strong>In Progress</strong>
-                <p>Network team is working on the issue.</p>
+                <p>
+                  {status === "In Progress"
+                    ? "Staff is working on the issue."
+                    : status === "Resolved"
+                    ? "Issue has been resolved."
+                    : "Pending"}
+                </p>
               </div>
 
             </div>
 
 
-            <div className="timeline-item">
+            <div
+              className={`timeline-item ${
+                status === "Resolved" ? "completed" : ""
+              }`}
+            >
 
               <div className="timeline-dot">
-                4
+                {status === "Resolved" ? "✓" : "4"}
               </div>
 
               <div>
                 <strong>Resolved</strong>
-                <p>Pending</p>
+                <p>
+                  {status === "Resolved"
+                    ? formatDate(issue.resolvedAt)
+                    : "Pending"}
+                </p>
               </div>
 
             </div>
@@ -196,7 +282,9 @@ function IssueDetails() {
           <h2>Resolution / Staff Update</h2>
 
           <p>
-            {issue.resolution}
+            {issue.resolution ||
+              issue.resolutionNotes ||
+              "No staff update yet."}
           </p>
 
         </div>

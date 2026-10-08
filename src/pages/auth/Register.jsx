@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
+import { registerUser } from "../../services/api";
 
 function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -16,6 +18,8 @@ function Register() {
 
   const [error, setError] = useState("");
 
+  const navigate = useNavigate();
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -25,7 +29,7 @@ function Register() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
@@ -65,7 +69,23 @@ function Register() {
       return;
     }
 
-    alert("Registration successful!");
+    try {
+      setLoading(true);
+
+      await registerUser({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        role: formData.role
+      });
+
+      // Registration successful → go to login
+      navigate("/login");
+    } catch (err) {
+      setError(err.message || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -92,6 +112,7 @@ function Register() {
               placeholder="Enter your full name"
               value={formData.name}
               onChange={handleChange}
+              disabled={loading}
             />
           </div>
 
@@ -106,6 +127,7 @@ function Register() {
               placeholder="Enter your email"
               value={formData.email}
               onChange={handleChange}
+              disabled={loading}
             />
           </div>
 
@@ -122,12 +144,14 @@ function Register() {
                 placeholder="Create a password"
                 value={formData.password}
                 onChange={handleChange}
+                disabled={loading}
               />
 
               <button
                 type="button"
                 className="password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -148,6 +172,7 @@ function Register() {
                 placeholder="Re-enter your password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
+                disabled={loading}
               />
 
               <button
@@ -156,6 +181,7 @@ function Register() {
                 onClick={() =>
                   setShowConfirmPassword(!showConfirmPassword)
                 }
+                disabled={loading}
               >
                 {showConfirmPassword ? (
                   <EyeOff size={20} />
@@ -176,6 +202,7 @@ function Register() {
               name="role"
               value={formData.role}
               onChange={handleChange}
+              disabled={loading}
             >
               <option value="">Select your role</option>
               <option value="student">Student</option>
@@ -191,15 +218,19 @@ function Register() {
           )}
 
           {/* Register */}
-          <button type="submit" className="login-button">
-            Create Account
+          <button
+            type="submit"
+            className="login-button"
+            disabled={loading}
+          >
+            {loading ? "Creating Account..." : "Create Account"}
           </button>
 
         </form>
 
         <p className="register-text">
-            Already have an account?{" "}
-            <Link to="/login">Login</Link>
+          Already have an account?{" "}
+          <Link to="/login">Login</Link>
         </p>
 
       </div>

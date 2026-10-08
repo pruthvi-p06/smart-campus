@@ -1,126 +1,67 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import StaffSidebar from "../../components/StaffSidebar";
+import { getStaffIssues } from "../../services/api";
 
 function AssignedIssues() {
-
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
 
-  const issues = [
-    {
-      id: 1,
-      title: "WiFi not working",
-      category: "Network",
-      location: "Lab 3",
-      priority: "High",
-      status: "Pending",
-      date: "16 Sept 2026",
-      description:
-        "The WiFi connection is not working properly in Lab 3."
-    },
-    {
-      id: 2,
-      title: "Broken Fan",
-      category: "Electrical",
-      location: "Block A",
-      priority: "Medium",
-      status: "In Progress",
-      date: "15 Sept 2026",
-      description:
-        "The ceiling fan is not functioning properly."
-    },
-    {
-      id: 3,
-      title: "Projector problem",
-      category: "Classroom",
-      location: "Room 205",
-      priority: "Low",
-      status: "Resolved",
-      date: "14 Sept 2026",
-      description:
-        "The classroom projector is not displaying properly."
-    },
-    {
-      id: 4,
-      title: "Light not working",
-      category: "Electrical",
-      location: "Room 104",
-      priority: "Medium",
-      status: "Pending",
-      date: "14 Sept 2026",
-      description:
-        "Two tube lights are not working in the classroom."
-    },
-    {
-      id: 5,
-      title: "Network connection issue",
-      category: "Network",
-      location: "Library",
-      priority: "High",
-      status: "In Progress",
-      date: "13 Sept 2026",
-      description:
-        "Students are unable to access the campus network."
-    },
-    {
-      id: 6,
-      title: "Water leakage",
-      category: "Maintenance",
-      location: "Block B",
-      priority: "High",
-      status: "Pending",
-      date: "13 Sept 2026",
-      description:
-        "Water leakage has been reported near the washroom area."
-    },
-    {
-      id: 7,
-      title: "Broken classroom chair",
-      category: "Furniture",
-      location: "Room 301",
-      priority: "Low",
-      status: "Resolved",
-      date: "12 Sept 2026",
-      description:
-        "A classroom chair is damaged and needs replacement."
-    },
-    {
-      id: 8,
-      title: "AC not working",
-      category: "Maintenance",
-      location: "Seminar Hall",
-      priority: "High",
-      status: "Pending",
-      date: "11 Sept 2026",
-      description:
-        "The air conditioning system is not functioning."
-    }
-  ];
+  const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
+  useEffect(() => {
+    const fetchIssues = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await getStaffIssues();
+
+        const issueData =
+          response.issues ||
+          response.data ||
+          response;
+
+        setIssues(Array.isArray(issueData) ? issueData : []);
+      } catch (err) {
+        setError(err.message || "Failed to load assigned issues.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIssues();
+  }, []);
 
   const filteredIssues = issues.filter((issue) => {
-
     const searchText = search.toLowerCase();
 
+    const title = issue.title || "";
+    const category = issue.category || "";
+    const location = issue.location || "";
+    const status = issue.status || "Pending";
+    const priority = issue.priority || "Medium";
+
     const matchesSearch =
-      issue.title.toLowerCase().includes(searchText) ||
-      issue.category.toLowerCase().includes(searchText) ||
-      issue.location.toLowerCase().includes(searchText);
+      title.toLowerCase().includes(searchText) ||
+      category.toLowerCase().includes(searchText) ||
+      location.toLowerCase().includes(searchText);
 
     const matchesStatus =
       statusFilter === "All" ||
-      issue.status === statusFilter;
+      status === statusFilter;
 
     const matchesPriority =
       priorityFilter === "All" ||
-      issue.priority === priorityFilter;
+      priority === priorityFilter;
 
     const matchesCategory =
       categoryFilter === "All" ||
-      issue.category === categoryFilter;
+      category === categoryFilter;
 
     return (
       matchesSearch &&
@@ -130,9 +71,17 @@ function AssignedIssues() {
     );
   });
 
+  const formatDate = (date) => {
+    if (!date) return "—";
+
+    return new Date(date).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    });
+  };
 
   return (
-
     <div className="dashboard-layout">
 
       <StaffSidebar />
@@ -214,9 +163,11 @@ function AssignedIssues() {
 
                 <option value="All">All</option>
                 <option value="Pending">Pending</option>
+
                 <option value="In Progress">
                   In Progress
                 </option>
+
                 <option value="Resolved">
                   Resolved
                 </option>
@@ -278,118 +229,159 @@ function AssignedIssues() {
 
           {/* Result Count */}
 
-          <div className="issue-count">
+          {!loading && !error && (
+            <div className="issue-count">
 
-            Showing {filteredIssues.length} of {issues.length} assigned issues
+              Showing {filteredIssues.length} of{" "}
+              {issues.length} assigned issues
 
-          </div>
+            </div>
+          )}
+
+
+          {/* Loading */}
+
+          {loading && (
+            <div className="no-issues">
+
+              <h2>Loading assigned issues...</h2>
+
+            </div>
+          )}
+
+
+          {/* Error */}
+
+          {!loading && error && (
+            <div className="error-message">
+
+              ⚠ {error}
+
+            </div>
+          )}
 
 
           {/* Issues */}
 
-          <div className="assigned-issues-list">
+          {!loading && !error && (
+            <div className="assigned-issues-list">
 
-            {filteredIssues.length > 0 ? (
+              {filteredIssues.length > 0 ? (
 
-              filteredIssues.map((issue) => (
+                filteredIssues.map((issue) => {
 
-                <div
-                  className="assigned-issue-card"
-                  key={issue.id}
-                >
+                  const issueId = issue._id || issue.id;
+                  const status = issue.status || "Pending";
+                  const priority = issue.priority || "Medium";
 
-                  <div className="assigned-issue-main">
+                  return (
 
-                    <div className="assigned-issue-title">
-
-                      <h2>
-                        {issue.title}
-                      </h2>
-
-                      <span
-                        className={`status ${issue.status
-                          .toLowerCase()
-                          .replace(" ", "-")}`}
-                      >
-                        {issue.status}
-                      </span>
-
-                    </div>
-
-
-                    <div className="issue-meta">
-
-                      <span>
-                        📁 {issue.category}
-                      </span>
-
-                      <span>
-                        📍 {issue.location}
-                      </span>
-
-                      <span>
-                        📅 {issue.date}
-                      </span>
-
-                    </div>
-
-
-                    <p className="assigned-description">
-                      {issue.description}
-                    </p>
-
-
-                    <div className="issue-priority">
-
-                      Priority:
-
-                      <strong
-                        className={`priority-${issue.priority.toLowerCase()}`}
-                      >
-                        {issue.priority}
-                      </strong>
-
-                    </div>
-
-                  </div>
-
-
-                  <div className="assigned-issue-action">
-
-                    <Link
-                      to={`/staff/issues/${issue.id}`}
-                      className="view-details-button"
+                    <div
+                      className="assigned-issue-card"
+                      key={issueId}
                     >
-                      View Details →
-                    </Link>
 
+                      <div className="assigned-issue-main">
+
+                        <div className="assigned-issue-title">
+
+                          <h2>
+                            {issue.title || "Untitled Issue"}
+                          </h2>
+
+                          <span
+                            className={`status ${status
+                              .toLowerCase()
+                              .replace(/\s+/g, "-")}`}
+                          >
+                            {status}
+                          </span>
+
+                        </div>
+
+
+                        <div className="issue-meta">
+
+                          <span>
+                            📁 {issue.category || "—"}
+                          </span>
+
+                          <span>
+                            📍 {issue.location || "—"}
+                          </span>
+
+                          <span>
+                            📅{" "}
+                            {formatDate(
+                              issue.createdAt ||
+                              issue.reportedDate
+                            )}
+                          </span>
+
+                        </div>
+
+
+                        <p className="assigned-description">
+
+                          {issue.description ||
+                            "No description provided."}
+
+                        </p>
+
+
+                        <div className="issue-priority">
+
+                          Priority:
+
+                          <strong
+                            className={`priority-${priority.toLowerCase()}`}
+                          >
+                            {priority}
+                          </strong>
+
+                        </div>
+
+                      </div>
+
+
+                      <div className="assigned-issue-action">
+
+                        <Link
+                          to={`/staff/issues/${issueId}`}
+                          className="view-details-button"
+                        >
+                          View Details →
+                        </Link>
+
+                      </div>
+
+                    </div>
+
+                  );
+                })
+
+              ) : (
+
+                <div className="no-issues">
+
+                  <div className="no-issues-icon">
+                    🔍
                   </div>
 
+                  <h2>
+                    No issues found
+                  </h2>
+
+                  <p>
+                    Try changing your search or filters.
+                  </p>
+
                 </div>
 
-              ))
+              )}
 
-            ) : (
-
-              <div className="no-issues">
-
-                <div className="no-issues-icon">
-                  🔍
-                </div>
-
-                <h2>
-                  No issues found
-                </h2>
-
-                <p>
-                  Try changing your search or filters.
-                </p>
-
-              </div>
-
-            )}
-
-          </div>
+            </div>
+          )}
 
         </div>
 

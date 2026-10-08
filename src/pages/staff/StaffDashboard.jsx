@@ -1,34 +1,50 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import StaffSidebar from "../../components/StaffSidebar";
+import { getStaffIssues } from "../../services/api";
 
 function StaffDashboard() {
+  const [issues, setIssues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const issues = [
-    {
-      id: 1,
-      title: "WiFi not working",
-      category: "Network",
-      location: "Lab 3",
-      priority: "High",
-      status: "Pending"
-    },
-    {
-      id: 2,
-      title: "Broken Fan",
-      category: "Electrical",
-      location: "Block A",
-      priority: "Medium",
-      status: "In Progress"
-    },
-    {
-      id: 3,
-      title: "Projector problem",
-      category: "Classroom",
-      location: "Room 205",
-      priority: "Low",
-      status: "Resolved"
-    }
-  ];
+  useEffect(() => {
+    const fetchIssues = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await getStaffIssues();
+
+        const issueData =
+          response.issues ||
+          response.data ||
+          response;
+
+        setIssues(Array.isArray(issueData) ? issueData : []);
+      } catch (err) {
+        setError(err.message || "Failed to load assigned issues.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIssues();
+  }, []);
+
+  const pendingCount = issues.filter(
+    (issue) => issue.status === "Pending"
+  ).length;
+
+  const inProgressCount = issues.filter(
+    (issue) => issue.status === "In Progress"
+  ).length;
+
+  const resolvedCount = issues.filter(
+    (issue) => issue.status === "Resolved"
+  ).length;
+
+  const assignedCount = issues.length;
 
   return (
     <div className="dashboard-layout">
@@ -83,7 +99,7 @@ function StaffDashboard() {
 
               <span>Assigned Issues</span>
 
-              <strong>8</strong>
+              <strong>{assignedCount}</strong>
 
             </div>
 
@@ -92,7 +108,7 @@ function StaffDashboard() {
 
               <span>Pending</span>
 
-              <strong>3</strong>
+              <strong>{pendingCount}</strong>
 
             </div>
 
@@ -101,7 +117,7 @@ function StaffDashboard() {
 
               <span>In Progress</span>
 
-              <strong>2</strong>
+              <strong>{inProgressCount}</strong>
 
             </div>
 
@@ -110,7 +126,7 @@ function StaffDashboard() {
 
               <span>Resolved</span>
 
-              <strong>3</strong>
+              <strong>{resolvedCount}</strong>
 
             </div>
 
@@ -144,49 +160,77 @@ function StaffDashboard() {
             </div>
 
 
-            {issues.map((issue) => (
-
-              <div
-                className="table-row"
-                key={issue.id}
-              >
-
-                <strong>
-                  {issue.title}
-                </strong>
-
-                <span>
-                  {issue.category}
-                </span>
-
-                <span>
-                  {issue.location}
-                </span>
-
-                <span
-                  className={`priority-${issue.priority.toLowerCase()}`}
-                >
-                  {issue.priority}
-                </span>
-
-                <span
-                  className={`status ${issue.status
-                    .toLowerCase()
-                    .replace(" ", "-")}`}
-                >
-                  {issue.status}
-                </span>
-
-                <Link
-                  to={`/staff/issues/${issue.id}`}
-                  className="action-link"
-                >
-                  View
-                </Link>
-
+            {loading && (
+              <div className="no-issues">
+                <p>Loading assigned issues...</p>
               </div>
+            )}
 
-            ))}
+
+            {!loading && error && (
+              <div className="error-message">
+                ⚠ {error}
+              </div>
+            )}
+
+
+            {!loading && !error && issues.length === 0 && (
+              <div className="no-issues">
+                <p>No issues assigned to you yet.</p>
+              </div>
+            )}
+
+
+            {!loading &&
+              !error &&
+              issues.map((issue) => {
+
+                const issueId = issue._id || issue.id;
+
+                return (
+                  <div
+                    className="table-row"
+                    key={issueId}
+                  >
+
+                    <strong>
+                      {issue.title}
+                    </strong>
+
+                    <span>
+                      {issue.category || "—"}
+                    </span>
+
+                    <span>
+                      {issue.location || "—"}
+                    </span>
+
+                    <span
+                      className={`priority-${(
+                        issue.priority || "Medium"
+                      ).toLowerCase()}`}
+                    >
+                      {issue.priority || "Medium"}
+                    </span>
+
+                    <span
+                      className={`status ${(issue.status || "Pending")
+                        .toLowerCase()
+                        .replace(/\s+/g, "-")}`}
+                    >
+                      {issue.status || "Pending"}
+                    </span>
+
+                    <Link
+                      to={`/staff/issues/${issueId}`}
+                      className="action-link"
+                    >
+                      View
+                    </Link>
+
+                  </div>
+                );
+              })}
 
           </div>
 

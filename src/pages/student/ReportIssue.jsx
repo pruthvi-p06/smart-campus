@@ -1,8 +1,8 @@
 import { useState } from "react";
 import DashboardLayout from "../../components/DashboardLayout";
+import { createIssue } from "../../services/api";
 
 function ReportIssue() {
-
   const [formData, setFormData] = useState({
     title: "",
     category: "",
@@ -14,29 +14,25 @@ function ReportIssue() {
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-
     const { name, value } = e.target;
 
     setFormData({
       ...formData,
       [name]: value
     });
-
   };
 
   const handleImageChange = (e) => {
-
     setFormData({
       ...formData,
-      image: e.target.files[0]
+      image: e.target.files[0] || null
     });
-
   };
 
-  const handleSubmit = (e) => {
-
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
@@ -67,21 +63,48 @@ function ReportIssue() {
       return;
     }
 
-    setSuccess("Issue submitted successfully!");
+    try {
+      setLoading(true);
 
-    setFormData({
-      title: "",
-      category: "",
-      location: "",
-      department: "",
-      description: "",
-      image: null
-    });
+      const issueData = new FormData();
 
+      issueData.append("title", formData.title.trim());
+      issueData.append("category", formData.category);
+      issueData.append("location", formData.location);
+      issueData.append("department", formData.department);
+      issueData.append("description", formData.description.trim());
+
+      if (formData.image) {
+        issueData.append("image", formData.image);
+      }
+
+      await createIssue(issueData);
+
+      setSuccess("Issue submitted successfully!");
+
+      setFormData({
+        title: "",
+        category: "",
+        location: "",
+        department: "",
+        description: "",
+        image: null
+      });
+
+      // Reset file input
+      const fileInput = document.getElementById("image");
+      if (fileInput) {
+        fileInput.value = "";
+      }
+
+    } catch (err) {
+      setError(err.message || "Failed to submit issue. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-
     <DashboardLayout>
 
       <div className="page-header">
@@ -96,7 +119,6 @@ function ReportIssue() {
 
       </div>
 
-
       <div className="issue-form-container">
 
         <form
@@ -105,7 +127,6 @@ function ReportIssue() {
         >
 
           {/* Issue Title */}
-
           <div className="form-group">
 
             <label htmlFor="title">
@@ -119,13 +140,12 @@ function ReportIssue() {
               placeholder="Example: WiFi not working"
               value={formData.title}
               onChange={handleChange}
+              disabled={loading}
             />
 
           </div>
 
-
           {/* Category */}
-
           <div className="form-group">
 
             <label htmlFor="category">
@@ -137,6 +157,7 @@ function ReportIssue() {
               name="category"
               value={formData.category}
               onChange={handleChange}
+              disabled={loading}
             >
 
               <option value="">
@@ -171,9 +192,7 @@ function ReportIssue() {
 
           </div>
 
-
           {/* Location */}
-
           <div className="form-group">
 
             <label htmlFor="location">
@@ -185,6 +204,7 @@ function ReportIssue() {
               name="location"
               value={formData.location}
               onChange={handleChange}
+              disabled={loading}
             >
 
               <option value="">
@@ -223,9 +243,7 @@ function ReportIssue() {
 
           </div>
 
-
           {/* Department */}
-
           <div className="form-group">
 
             <label htmlFor="department">
@@ -237,6 +255,7 @@ function ReportIssue() {
               name="department"
               value={formData.department}
               onChange={handleChange}
+              disabled={loading}
             >
 
               <option value="">
@@ -271,9 +290,7 @@ function ReportIssue() {
 
           </div>
 
-
           {/* Description */}
-
           <div className="form-group">
 
             <label htmlFor="description">
@@ -287,13 +304,12 @@ function ReportIssue() {
               placeholder="Describe the issue in detail..."
               value={formData.description}
               onChange={handleChange}
+              disabled={loading}
             />
 
           </div>
 
-
           {/* Image */}
-
           <div className="form-group">
 
             <label htmlFor="image">
@@ -306,6 +322,7 @@ function ReportIssue() {
               type="file"
               accept="image/*"
               onChange={handleImageChange}
+              disabled={loading}
             />
 
             <small>
@@ -314,39 +331,32 @@ function ReportIssue() {
 
           </div>
 
-
           {/* Error */}
-
           {error && (
             <div className="error-message">
               ⚠ {error}
             </div>
           )}
 
-
           {/* Success */}
-
           {success && (
             <div className="success-message">
               ✓ {success}
             </div>
           )}
 
-
           {/* Submit */}
-
           <button
             type="submit"
             className="primary-button submit-button"
+            disabled={loading}
           >
-            Submit Issue
+            {loading ? "Submitting..." : "Submit Issue"}
           </button>
 
         </form>
 
-
         {/* AI Preview */}
-
         <div className="ai-preview">
 
           <h2>🤖 AI Issue Analysis</h2>
@@ -372,7 +382,6 @@ function ReportIssue() {
       </div>
 
     </DashboardLayout>
-
   );
 }
 
