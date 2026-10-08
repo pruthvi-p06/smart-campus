@@ -60,9 +60,9 @@ function Login() {
       if (role === "admin") {
         navigate("/admin");
       } else if (role === "staff") {
-        navigate("/staff");
+        navigate("/staff/dashboard");
       } else {
-        navigate("/student");
+        navigate("/student/dashboard");
       }
     } catch (err) {
       setError(err.message || "Login failed. Please try again.");
