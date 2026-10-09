@@ -12,30 +12,47 @@ connectDB();
 
 const app = express();
 
-// Middleware: Body parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
 // Middleware: Cross-Origin Resource Sharing (CORS)
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
+  'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl, postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-        return callback(null, true);
+if (process.env.CLIENT_URL && !allowedOrigins.includes(process.env.CLIENT_URL)) {
+  allowedOrigins.push(process.env.CLIENT_URL);
+}
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, postman)
+    if (!origin) return callback(null, true);
+
+    const isExplicitlyAllowed = allowedOrigins.includes(origin);
+    const isCodespaces = (() => {
+      try {
+        const { hostname } = new URL(origin);
+        return hostname.endsWith('.app.github.dev') || hostname.endsWith('.github.dev');
+      } catch {
+        return false;
       }
-      return callback(new Error('CORS policy: Not allowed by CORS'), false);
-    },
-    credentials: true,
-  })
-);
+    })();
+    if (isExplicitlyAllowed || isCodespaces) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS policy: Not allowed by CORS'), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+
+// Middleware: Body parser
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded issue images statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
