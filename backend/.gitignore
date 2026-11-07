@@ -3,6 +3,8 @@ node_modules/
 
 # Environment variables / secrets
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
@@ -22,3 +24,6 @@ Thumbs.db
 # IDE files
 .vscode/
 .idea/
+
+dist/
+build/

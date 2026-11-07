@@ -3,7 +3,10 @@ const jwt = require('jsonwebtoken');
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'smartcampus_dev_secret_key_84930271_jwt', {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured. Add it to backend/.env and restart the server.');
+  }
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '7d',
   });
 };
@@ -15,8 +18,17 @@ const registerUser = async (req, res) => {
   try {
     const { name, email, password, phone, department, year, role } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      return res.status(400).json({ message: 'Please provide a valid email address.' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+    }
+    if (!['student', 'staff', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Please select a valid account type.' });
     }
 
     const userExists = await User.findOne({ email: email.toLowerCase() });
@@ -24,12 +36,14 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User with this email already exists' });
     }
 
-    // Default role is student unless explicitly registered with valid role (admin accounts should ideally be seeded or created by admin)
-    const allowedRole = ['student', 'staff'].includes(role) ? role : 'student';
+    // All account types are registered through the website. The selected role is
+    // stored as part of the registration request. Public admin registration is
+    // enabled by project requirement; protect the deployment accordingly.
+    const allowedRole = role;
 
     const user = await User.create({
-      name,
-      email: email.toLowerCase(),
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password,
       phone: phone || '',
       department: department || '',
@@ -120,6 +134,9 @@ const getCurrentUser = async (req, res) => {
     return res.status(500).json({ message: `Failed to fetch user profile: ${error.message}` });
   }
 };
+
+
+
 
 module.exports = {
   registerUser,

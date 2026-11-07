@@ -1,16 +1,60 @@
-# React + Vite
+# SmartCampus – Campus Issue & Resource Management
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SmartCampus provides separate student, staff and administrator workspaces for reporting, assigning and resolving campus issues, managing resources, and viewing operational information.
 
-Currently, two official plugins are available:
+## Run the application
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### Backend
+1. Open a terminal in the `backend` folder.
+2. Install dependencies with `npm install`.
+3. Create `backend/.env` using `.env.example` as a reference. Set your MongoDB connection string, JWT secret, and frontend URL. Keep real credentials out of source control.
+4. Start the API with `npm run dev`. The default API port is `5000`.
 
-## React Compiler
+### Frontend
+1. Open a second terminal in the project root.
+2. Install dependencies with `npm install`.
+3. Start Vite with `npm run dev`.
+4. Open the local URL printed by Vite.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Website account registration
 
-## Expanding the ESLint configuration
+All accounts are created through the website. The registration form supports Student, Staff and Administrator roles. Administrator registration is also available at `/admin/create-account`; administrators sign in at `/admin/login`. All roles use the same `POST /api/auth/register` endpoint and the same password hashing and duplicate-email validation. There are no seeded administrator credentials, command-line account creation scripts, setup keys, or first-admin bootstrap endpoints.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+**Access-control warning:** because public administrator self-registration is enabled as requested, anyone who can reach the website can create an administrator account. This is suitable for a trusted classroom/demo environment, but not a public production deployment.
+
+## Important configuration
+
+- `MONGO_URI`: MongoDB connection string.
+- `JWT_SECRET`: use a long, random secret in any deployed environment.
+- `CLIENT_URL`: frontend origin allowed by backend CORS.
+- `GEMINI_API_KEY`: optional; keep it on the backend only.
+
+Do not commit `.env` files or share API keys.
+
+
+## Final setup notes
+
+- Student, Staff and Admin accounts are created through the website registration pages.
+- Registration creates the account in MongoDB and signs the user in immediately.
+- The project does not create default/demo accounts, sample issues, sample resources or sample notifications.
+- `backend/seed.js` is intentionally a safe no-op; it does not erase or populate your database.
+- Copy `backend/.env.example` to `backend/.env` and fill in your own MongoDB URI and a strong JWT_SECRET. Never commit or share `.env`.
+- The first run starts with empty dashboards until users submit issues or an administrator creates resources.
+- Local frontend ports 5173 and 5174 are allowed by the backend CORS configuration.
+
+### Run locally (Windows PowerShell)
+
+Terminal 1:
+```powershell
+cd backend
+npm install
+npm run dev
+```
+
+Terminal 2 (project root):
+```powershell
+npm install
+npm run dev
+```
+
+Open the Vite URL printed in Terminal 2.

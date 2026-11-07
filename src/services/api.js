@@ -1,10 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1")
-    ? "http://localhost:5000/api"
-    : "https://turbo-system-x9wrjp7v96c97g4-5000.app.github.dev/api");
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api").replace(/\/$/, "");
 
 const request = async (endpoint, options = {}) => {
   const token = localStorage.getItem("token");
@@ -187,4 +181,16 @@ export const markNotificationRead = (id) =>
 export const markAllNotificationsRead = () =>
   request("/notifications/read-all", {
     method: "PUT",
+  });
+
+// ==================== PUBLIC LANDING PAGE ====================
+
+export const getPublicOverview = () => request("/public/overview");
+
+// ==================== CAMPUS CHATBOT ====================
+
+export const askCampusAssistant = (chatData) =>
+  request("/ai/chat", {
+    method: "POST",
+    body: JSON.stringify(chatData),
   });
