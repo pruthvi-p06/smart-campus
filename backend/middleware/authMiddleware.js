@@ -16,7 +16,14 @@ const authenticateUser = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'smartcampus_dev_secret_key_84930271_jwt');
+    if (!process.env.JWT_SECRET) {
+  return res.status(500).json({
+    success: false,
+    message: 'JWT_SECRET is not configured on the server'
+  });
+}
+
+const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
 
     if (!user) {

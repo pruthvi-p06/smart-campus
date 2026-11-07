@@ -71,7 +71,7 @@ function ProtectedRoute({ allowedRole, children }) {
 
     return (
       <Navigate
-        to="/login"
+        to={allowedRole === "admin" ? "/admin/login" : "/login"}
         replace
         state={{ from: location }}
       />

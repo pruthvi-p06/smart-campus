@@ -72,15 +72,21 @@ function Register() {
     try {
       setLoading(true);
 
-      await registerUser({
+      const response = await registerUser({
         name: formData.name.trim(),
         email: formData.email.trim(),
         password: formData.password,
         role: formData.role
       });
 
-      // Registration successful → go to login
-      navigate("/login");
+      if (response.token) localStorage.setItem("token", response.token);
+      if (response.user) localStorage.setItem("user", JSON.stringify(response.user));
+      const destination = response.user?.role === "admin"
+        ? "/admin/dashboard"
+        : response.user?.role === "staff"
+          ? "/staff/dashboard"
+          : "/student/dashboard";
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");
     } finally {
@@ -207,6 +213,7 @@ function Register() {
               <option value="">Select your role</option>
               <option value="student">Student</option>
               <option value="staff">Staff</option>
+              <option value="admin">Administrator</option>
             </select>
           </div>
 

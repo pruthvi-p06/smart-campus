@@ -58,7 +58,7 @@ function Login() {
       const role = response.user?.role;
 
       if (role === "admin") {
-        navigate("/admin");
+        navigate("/admin/dashboard", { replace: true });
       } else if (role === "staff") {
         navigate("/staff/dashboard");
       } else {
@@ -162,6 +162,8 @@ function Login() {
           </button>
 
         </form>
+
+        <p className="register-text admin-login-shortcut">Administrator? <Link to="/admin/login">Use the admin sign-in portal</Link></p>
 
         {/* Register */}
         <p className="register-text">

@@ -8,6 +8,8 @@ import {
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import AdminLogin from "./pages/auth/AdminLogin";
+import AdminCreateAccount from "./pages/auth/AdminCreateAccount";
 
 import StudentDashboard from "./pages/student/StudentDashboard";
 import ReportIssue from "./pages/student/ReportIssue";
@@ -26,6 +28,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import Admin from "./pages/admin/Admin";
 
 import ProtectedRoute from "./components/ProtectedRoute";
+import CampusChatbot from "./components/CampusChatbot";
 
 function App() {
   return (
@@ -49,6 +52,10 @@ function App() {
           path="/register"
           element={<Register />}
         />
+
+        {/* Dedicated administrator sign-in; public route, role checked by API response */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/create-account" element={<AdminCreateAccount />} />
 
 
         {/* STUDENT ROUTES */}
@@ -169,6 +176,15 @@ function App() {
         {/* ADMIN ROUTES */}
 
         <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <Navigate to="/admin/dashboard" replace />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/admin/dashboard"
           element={
             <ProtectedRoute allowedRole="admin">
@@ -201,6 +217,7 @@ function App() {
 
       </Routes>
 
+      <CampusChatbot />
     </BrowserRouter>
   );
 }

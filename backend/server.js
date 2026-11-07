@@ -16,6 +16,8 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
   'http://localhost:3000',
 ];
 
@@ -77,6 +79,7 @@ app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/ai', require('./routes/aiRoutes'));
+app.use('/api/public', require('./routes/publicRoutes'));
 
 // 404 Route Not Found Handler
 app.use((req, res, next) => {
