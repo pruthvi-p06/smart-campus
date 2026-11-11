@@ -1,3 +1,4 @@
+const sendError = require('../utils/sendError');
 const Issue = require('../models/Issue');
 const User = require('../models/User');
 
@@ -67,7 +68,7 @@ const getAdminAnalytics = async (req, res) => {
       issuesByDepartment,
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to compile analytics: ${error.message}` });
+    return sendError(res, error, 'Failed to compile analytics');
   }
 };
 

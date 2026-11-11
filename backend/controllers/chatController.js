@@ -9,27 +9,35 @@ const getFallbackReply = (message) => {
   if (/hello|hi\b|hey\b|good morning|good afternoon/.test(text)) {
     return 'Hello! Welcome to SmartCampus. I can guide you through reporting campus issues, tracking requests, using resources and navigating the student, staff or admin areas. What would you like help with?';
   }
+
   if (/report|raise|submit|new complaint|new issue/.test(text)) {
     return 'To report a campus issue, sign in with your student account and open Report Issue from your dashboard. Add a clear title, category, location and description, attach an image if useful, and submit. You can then follow its status under My Issues.';
   }
+
   if (/track|status|my issue|my complaint|progress/.test(text)) {
     return 'Sign in and open My Issues from the student dashboard. Select a request to view its details and current status. The usual stages are Pending, In Progress and Resolved.';
   }
+
   if (/register|sign up|create account/.test(text)) {
     return 'Choose Get started or Register on the landing page and complete the registration form. After creating your account, use your registered email and password to log in. Your access depends on the role assigned to your account.';
   }
+
   if (/login|sign in|password/.test(text)) {
     return 'Use the Log in button and enter your registered email and password. If you cannot access your account, check your credentials or contact your campus administrator for account assistance.';
   }
+
   if (/staff|assign|technician/.test(text)) {
     return 'Staff members can open their staff dashboard to view issues assigned to them, open an issue for details and update its progress. Assignment and staff-account management are handled by an administrator.';
   }
+
   if (/admin|administrator|analytics|users/.test(text)) {
     return 'The admin workspace is used to manage users, review and assign reported issues, manage campus resources and view operational analytics. Admin access is restricted to accounts with the administrator role.';
   }
+
   if (/resource|facility|facilities/.test(text)) {
     return 'Open Resources from your signed-in dashboard to view the campus resources available in the system. Availability and details depend on the information maintained by your campus administrator.';
   }
+
   if (/priority|urgent|emergency|danger|fire|electric shock/.test(text)) {
     return 'When reporting an issue, describe its impact clearly so the campus team can assess its priority. If there is immediate danger, such as fire, exposed live wiring or a serious injury, do not wait for an app response—contact campus security or local emergency services directly.';
   }
@@ -39,68 +47,159 @@ const getFallbackReply = (message) => {
 
 const askCampusAssistant = async (req, res) => {
   try {
-    const message = typeof req.body.message === 'string' ? req.body.message.trim() : '';
+    const message =
+      typeof req.body?.message === 'string'
+        ? req.body.message.trim()
+        : '';
+
     if (!message) {
-      return res.status(400).json({ message: 'Please enter a message.' });
-    }
-    if (message.length > MAX_MESSAGE_LENGTH) {
-      return res.status(400).json({ message: `Message must be ${MAX_MESSAGE_LENGTH} characters or fewer.` });
+      return res.status(400).json({
+        message: 'Please enter a message.',
+      });
     }
 
-    const history = Array.isArray(req.body.history)
-      ? req.body.history.slice(-MAX_HISTORY_ITEMS).filter((item) =>
-          item && ['user', 'assistant'].includes(item.role) && typeof item.text === 'string'
-        )
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({
+        message: `Message must be ${MAX_MESSAGE_LENGTH} characters or fewer.`,
+      });
+    }
+
+    const history = Array.isArray(req.body?.history)
+      ? req.body.history
+          .slice(-MAX_HISTORY_ITEMS)
+          .filter(
+            (item) =>
+              item &&
+              ['user', 'assistant'].includes(item.role) &&
+              typeof item.text === 'string'
+          )
       : [];
 
-    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
-      try {
-        const contents = history
-          .map((item) => ({
-            role: item.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: item.text.slice(0, MAX_MESSAGE_LENGTH) }],
-          }))
-          .filter((item) => item.parts[0].text.trim());
-        contents.push({ role: 'user', parts: [{ text: message }] });
+    let geminiFailed = false;
 
-        const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': process.env.GEMINI_API_KEY.trim(),
-          },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: CAMPUS_SYSTEM_INSTRUCTION }] },
-            contents,
-            generationConfig: { temperature: 0.5, maxOutputTokens: 500 },
-          }),
-        });
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
 
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error?.message || `Gemini request failed (${response.status})`);
+    if (apiKey) {
+      const contents = history
+        .map((item) => ({
+          role: item.role === 'assistant' ? 'model' : 'user',
+          parts: [
+            {
+              text: item.text.slice(0, MAX_MESSAGE_LENGTH),
+            },
+          ],
+        }))
+        .filter((item) => item.parts[0].text.trim());
+
+      contents.push({
+        role: 'user',
+        parts: [{ text: message }],
+      });
+
+      const model =
+        process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+
+      // Retry temporary Gemini API failures up to 3 times.
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const controller = new AbortController();
+
+        const timeout = setTimeout(() => {
+          controller.abort();
+        }, 30000);
+
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+            {
+              method: 'POST',
+              signal: controller.signal,
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey,
+              },
+              body: JSON.stringify({
+                systemInstruction: {
+                  parts: [{ text: CAMPUS_SYSTEM_INSTRUCTION }],
+                },
+                contents,
+                generationConfig: {
+                  temperature: 0.5,
+                  maxOutputTokens: 500,
+                },
+              }),
+            }
+          );
+
+          const data = await response.json().catch(() => ({}));
+
+          if (response.ok) {
+            const reply = data.candidates?.[0]?.content?.parts
+              ?.map((part) => part.text || '')
+              .join('')
+              .trim();
+
+            if (reply) {
+              return res.status(200).json({
+                reply,
+                provider: 'gemini',
+              });
+            }
+
+            console.error(
+              '[Campus Chatbot] Gemini returned an empty response.'
+            );
+
+            break;
+          }
+
+          const retryableStatuses = [
+            429, 500, 502, 503, 504,
+          ];
+
+          console.error(
+            `[Campus Chatbot] Gemini API error (${response.status}):`,
+            data.error?.message || 'Unknown error'
+          );
+
+          if (!retryableStatuses.includes(response.status)) {
+            break;
+          }
+        } catch (error) {
+          console.error(
+            '[Campus Chatbot] Gemini request failed:',
+            error.name === 'AbortError'
+              ? 'Request timed out'
+              : error.message
+          );
+        } finally {
+          clearTimeout(timeout);
         }
-        const reply = data.candidates?.[0]?.content?.parts
-          ?.map((part) => part.text || '')
-          .join('')
-          .trim();
-        if (!reply) throw new Error('Gemini returned an empty response.');
 
-        return res.status(200).json({ reply, provider: 'gemini' });
-      } catch (error) {
-        console.error('[Campus Chatbot] Gemini request failed; using campus guide fallback:', error.message);
+        if (attempt < 3) {
+          const delay = 1000 * Math.pow(2, attempt - 1);
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
       }
+
+      geminiFailed = true;
     }
 
+    // Fallback response if Gemini is unavailable.
     return res.status(200).json({
       reply: getFallbackReply(message),
       provider: 'campus-guide',
-      notice: process.env.GEMINI_API_KEY ? 'AI service temporarily unavailable; returned a campus guide response.' : 'Add GEMINI_API_KEY to backend/.env to enable Gemini-powered replies.',
+      notice: geminiFailed
+        ? 'SmartCampus Guide Mode is active. You can still get help with campus services.'
+        : 'Gemini is not configured, so this is a built-in campus guide answer.',
     });
   } catch (error) {
     console.error('[Campus Chatbot] Error:', error.message);
-    return res.status(500).json({ message: 'The campus assistant could not process that message. Please try again.' });
+
+    return res.status(500).json({
+      message:
+        'The campus assistant could not process that message. Please try again.',
+    });
   }
 };
 

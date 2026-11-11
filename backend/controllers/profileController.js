@@ -1,3 +1,4 @@
+const sendError = require('../utils/sendError');
 const User = require('../models/User');
 
 // @desc    Get current user profile
@@ -11,7 +12,7 @@ const getUserProfile = async (req, res) => {
     }
     return res.status(200).json(user);
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch profile: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch profile');
   }
 };
 
@@ -34,7 +35,10 @@ const updateUserProfile = async (req, res) => {
     if (year !== undefined) user.year = year;
 
     // Optional password update
-    if (password && password.trim() !== '') {
+    if (typeof password === 'string' && password.trim() !== '') {
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+      }
       user.password = password; // Pre-save hook will hash it
     }
 
@@ -54,7 +58,7 @@ const updateUserProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to update profile: ${error.message}` });
+    return sendError(res, error, 'Failed to update profile');
   }
 };
 

@@ -5,7 +5,7 @@ import { registerUser } from "../../services/api";
 
 export default function AdminCreateAccount() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
+  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "", adminCode: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -16,9 +16,10 @@ export default function AdminCreateAccount() {
     setError("");
     if (form.password.length < 6) return setError("Password must contain at least 6 characters.");
     if (form.password !== form.confirmPassword) return setError("The passwords do not match.");
+    if (!form.adminCode.trim()) return setError("Enter the administrator invite code.");
     try {
       setLoading(true);
-      await registerUser({ name: form.name.trim(), email: form.email.trim(), password: form.password, role: "admin" });
+      await registerUser({ name: form.name.trim(), email: form.email.trim(), password: form.password, role: "admin", adminCode: form.adminCode.trim() });
       navigate("/admin/login", { replace: true, state: { registered: true } });
     } catch (err) {
       setError(err.message || "Unable to create the administrator account.");
@@ -45,6 +46,7 @@ export default function AdminCreateAccount() {
             <label className="admin-auth-label" htmlFor="admin-register-email">Administrator email</label><input id="admin-register-email" className="admin-auth-input" type="email" autoComplete="email" value={form.email} onChange={update("email")} placeholder="Enter your email" required disabled={loading}/>
             <label className="admin-auth-label" htmlFor="admin-register-password">Create password</label><div className="admin-auth-password-wrap"><input id="admin-register-password" className="admin-auth-input" type={showPassword ? "text" : "password"} minLength={6} autoComplete="new-password" value={form.password} onChange={update("password")} placeholder="At least 6 characters" required disabled={loading}/><button type="button" aria-label="Toggle password visibility" onClick={() => setShowPassword((v) => !v)}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
             <label className="admin-auth-label" htmlFor="admin-register-confirm">Confirm password</label><input id="admin-register-confirm" className="admin-auth-input" type="password" autoComplete="new-password" value={form.confirmPassword} onChange={update("confirmPassword")} placeholder="Re-enter your password" required disabled={loading}/>
+            <label className="admin-auth-label" htmlFor="admin-register-code">Administrator invite code</label><input id="admin-register-code" className="admin-auth-input" type="password" autoComplete="off" value={form.adminCode} onChange={update("adminCode")} placeholder="Provided by your system owner" required disabled={loading}/>
             {error && <div className="admin-auth-error" role="alert">{error}</div>}
             <button className="admin-auth-submit" type="submit" disabled={loading}>{loading ? "Creating account…" : "Create admin account"}<span>→</span></button>
           </form>

@@ -59,6 +59,11 @@ const issueSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Progress notes written by the assigned staff member (StaffIssueDetails page)
+    staffUpdate: {
+      type: String,
+      default: '',
+    },
     reportedAt: {
       type: Date,
       default: Date.now,

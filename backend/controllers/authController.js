@@ -1,5 +1,7 @@
+const crypto = require('crypto');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const sendError = require('../utils/sendError');
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
@@ -11,14 +13,33 @@ const generateToken = (id) => {
   });
 };
 
+const publicUser = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  department: user.department,
+  year: user.year,
+  phone: user.phone,
+  status: user.status,
+});
+
+// Constant-time comparison so the invite code cannot be guessed by timing.
+const codesMatch = (supplied, expected) => {
+  const a = crypto.createHash('sha256').update(String(supplied || '')).digest();
+  const b = crypto.createHash('sha256').update(String(expected || '')).digest();
+  return crypto.timingSafeEqual(a, b);
+};
+
 // @desc    Register a new user
 // @route   POST /api/auth/register
-// @access  Public
+// @access  Public (students/staff). Admin accounts additionally need ADMIN_INVITE_CODE.
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, phone, department, year, role } = req.body;
+    const { name, email, password, phone, department, year, role, adminCode } = req.body || {};
 
-    if (!name?.trim() || !email?.trim() || !password) {
+    if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' ||
+        !name.trim() || !email.trim() || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
     }
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
@@ -27,28 +48,39 @@ const registerUser = async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
     }
-    if (!['student', 'staff', 'admin'].includes(role)) {
+
+    const requestedRole = role || 'student';
+    if (!['student', 'staff', 'admin'].includes(requestedRole)) {
       return res.status(400).json({ message: 'Please select a valid account type.' });
     }
 
-    const userExists = await User.findOne({ email: email.toLowerCase() });
-    if (userExists) {
-      return res.status(400).json({ message: 'User with this email already exists' });
+    // Administrator accounts cannot be created anonymously.
+    if (requestedRole === 'admin') {
+      const expectedCode = process.env.ADMIN_INVITE_CODE;
+      if (!expectedCode || !expectedCode.trim()) {
+        return res.status(403).json({
+          message: 'Administrator self-registration is disabled. Ask an existing administrator to create your account.',
+        });
+      }
+      if (!codesMatch(adminCode, expectedCode.trim())) {
+        return res.status(403).json({ message: 'Invalid administrator invite code.' });
+      }
     }
 
-    // All account types are registered through the website. The selected role is
-    // stored as part of the registration request. Public admin registration is
-    // enabled by project requirement; protect the deployment accordingly.
-    const allowedRole = role;
+    const normalisedEmail = email.trim().toLowerCase();
+    const userExists = await User.findOne({ email: normalisedEmail });
+    if (userExists) {
+      return res.status(409).json({ message: 'User with this email already exists' });
+    }
 
     const user = await User.create({
       name: name.trim(),
-      email: email.trim().toLowerCase(),
+      email: normalisedEmail,
       password,
-      phone: phone || '',
-      department: department || '',
-      year: year || '',
-      role: allowedRole,
+      phone: typeof phone === 'string' ? phone : '',
+      department: typeof department === 'string' ? department : '',
+      year: typeof year === 'string' ? year : '',
+      role: requestedRole,
       status: 'active',
     });
 
@@ -57,19 +89,10 @@ const registerUser = async (req, res) => {
     return res.status(201).json({
       message: 'Registration successful',
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        department: user.department,
-        year: user.year,
-        phone: user.phone,
-        status: user.status,
-      },
+      user: publicUser(user),
     });
   } catch (error) {
-    return res.status(500).json({ message: `Registration failed: ${error.message}` });
+    return sendError(res, error, 'Registration failed');
   }
 };
 
@@ -78,20 +101,16 @@ const registerUser = async (req, res) => {
 // @access  Public
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
 
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return res.status(400).json({ message: 'Please provide both email and password' });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' });
-    }
-
-    if (user.status !== 'active') {
-      return res.status(403).json({ message: 'Your account has been deactivated. Please contact an administrator.' });
     }
 
     const isMatch = await user.matchPassword(password);
@@ -99,24 +118,19 @@ const loginUser = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    if (user.status !== 'active') {
+      return res.status(403).json({ message: 'Your account has been deactivated. Please contact an administrator.' });
+    }
+
     const token = generateToken(user._id);
 
     return res.status(200).json({
       message: 'Login successful',
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        department: user.department,
-        year: user.year,
-        phone: user.phone,
-        status: user.status,
-      },
+      user: publicUser(user),
     });
   } catch (error) {
-    return res.status(500).json({ message: `Login failed: ${error.message}` });
+    return sendError(res, error, 'Login failed');
   }
 };
 
@@ -131,12 +145,9 @@ const getCurrentUser = async (req, res) => {
     }
     return res.status(200).json({ user });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch user profile: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch user profile');
   }
 };
-
-
-
 
 module.exports = {
   registerUser,

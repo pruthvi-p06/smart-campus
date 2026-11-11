@@ -1,3 +1,4 @@
+const sendError = require('../utils/sendError');
 const Resource = require('../models/Resource');
 
 // @desc    Get all campus resources
@@ -11,17 +12,18 @@ const getAllResources = async (req, res) => {
     if (category) query.category = category;
     if (status) query.status = status;
     if (search) {
+      const escaped = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { location: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
+        { name: { $regex: escaped, $options: 'i' } },
+        { location: { $regex: escaped, $options: 'i' } },
+        { description: { $regex: escaped, $options: 'i' } },
       ];
     }
 
     const resources = await Resource.find(query).sort({ name: 1 });
     return res.status(200).json(resources);
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch resources: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch resources');
   }
 };
 
@@ -49,7 +51,7 @@ const createResource = async (req, res) => {
       resource,
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to create resource: ${error.message}` });
+    return sendError(res, error, 'Failed to create resource');
   }
 };
 
@@ -78,7 +80,7 @@ const updateResource = async (req, res) => {
       resource,
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to update resource: ${error.message}` });
+    return sendError(res, error, 'Failed to update resource');
   }
 };
 
@@ -97,7 +99,7 @@ const deleteResource = async (req, res) => {
 
     return res.status(200).json({ message: 'Resource deleted successfully' });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to delete resource: ${error.message}` });
+    return sendError(res, error, 'Failed to delete resource');
   }
 };
 
