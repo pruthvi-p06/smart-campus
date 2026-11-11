@@ -12,15 +12,16 @@ const {
 const { authenticateUser } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 const upload = require('../middleware/uploadMiddleware');
+const validateObjectId = require('../middleware/validateObjectId');
 
 // Student Issue Routes
 router.post('/', authenticateUser, authorizeRoles('student', 'admin'), upload.single('image'), createIssue);
 router.get('/my', authenticateUser, authorizeRoles('student', 'admin'), getMyIssues);
 
 // Staff Specific Status Update
-router.put('/:id/status', authenticateUser, authorizeRoles('staff', 'admin'), updateIssueStatusByStaff);
+router.put('/:id/status', validateObjectId, authenticateUser, authorizeRoles('staff', 'admin'), updateIssueStatusByStaff);
 
 // General Issue Details Route
-router.get('/:id', authenticateUser, getIssueById);
+router.get('/:id', validateObjectId, authenticateUser, getIssueById);
 
 module.exports = router;

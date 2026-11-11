@@ -1,3 +1,4 @@
+import AdminSidebar from "../../components/AdminSidebar";
 import { getImageUrl } from "../../utils/imageUrl";
 import { useEffect, useState } from "react";
 import {
@@ -46,7 +47,19 @@ import {
 /* =========================================================
    ADMIN SIDEBAR
 ========================================================= */
+function AdminLayout({ children }) {
+  return (
+    <div className="dashboard-layout">
+      <AdminSidebar />
 
+      <div className="dashboard-main">
+        <main className="dashboard-content">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
 function AdminIssues() {
   const [issues, setIssues] = useState([]);
   const [search, setSearch] = useState("");
@@ -384,6 +397,8 @@ function AdminIssueDetails() {
       setStaff(
         issueData.assignedTo?._id || ""
       );
+
+      setAdminNote(issueData.adminNote || "");
 
     } catch (err) {
       setError(

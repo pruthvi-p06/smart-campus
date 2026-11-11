@@ -1,3 +1,4 @@
+const sendError = require('../utils/sendError');
 const Notification = require('../models/Notification');
 
 // @desc    Get notifications for logged-in user
@@ -19,7 +20,7 @@ const getNotifications = async (req, res) => {
       notifications,
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch notifications: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch notifications');
   }
 };
 
@@ -45,7 +46,7 @@ const markNotificationAsRead = async (req, res) => {
       notification,
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to update notification: ${error.message}` });
+    return sendError(res, error, 'Failed to update notification');
   }
 };
 
@@ -57,7 +58,7 @@ const markAllNotificationsAsRead = async (req, res) => {
     await Notification.updateMany({ userId: req.user._id, read: false }, { $set: { read: true } });
     return res.status(200).json({ message: 'All notifications marked as read' });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to mark all as read: ${error.message}` });
+    return sendError(res, error, 'Failed to mark all as read');
   }
 };
 

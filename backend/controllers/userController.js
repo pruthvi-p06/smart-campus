@@ -1,4 +1,8 @@
+const sendError = require('../utils/sendError');
 const User = require('../models/User');
+
+const ROLES = ['student', 'staff', 'admin'];
+const STATUSES = ['active', 'inactive'];
 
 // @desc    Get all users with search & filters (Admin)
 // @route   GET /api/admin/users
@@ -13,7 +17,8 @@ const getAllUsers = async (req, res) => {
     if (status) query.status = status;
 
     if (search) {
-      const searchRegex = { $regex: search, $options: 'i' };
+      const escaped = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = { $regex: escaped, $options: 'i' };
       query.$or = [{ name: searchRegex }, { email: searchRegex }, { department: searchRegex }];
     }
 
@@ -21,7 +26,7 @@ const getAllUsers = async (req, res) => {
 
     return res.status(200).json(users);
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch users: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch users');
   }
 };
 
@@ -32,18 +37,25 @@ const createUser = async (req, res) => {
   try {
     const { name, email, password, role, department, year, phone, status } = req.body;
 
-    if (!name || !email || !password || !role) {
+    if (typeof name !== 'string' || typeof email !== 'string' || typeof password !== 'string' ||
+        !name.trim() || !email.trim() || !password || !role) {
       return res.status(400).json({ message: 'Name, email, password, and role are required' });
     }
+    if (!ROLES.includes(role)) {
+      return res.status(400).json({ message: 'Role must be student, staff or admin' });
+    }
+    if (status && !STATUSES.includes(status)) {
+      return res.status(400).json({ message: "Status must be either 'active' or 'inactive'" });
+    }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({ email: email.trim().toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: 'A user with this email already exists' });
+      return res.status(409).json({ message: 'A user with this email already exists' });
     }
 
     const user = await User.create({
-      name,
-      email: email.toLowerCase(),
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password,
       role,
       department: department || '',
@@ -66,7 +78,7 @@ const createUser = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to create user: ${error.message}` });
+    return sendError(res, error, 'Failed to create user');
   }
 };
 
@@ -80,6 +92,20 @@ const updateUser = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (role && !ROLES.includes(role)) {
+      return res.status(400).json({ message: 'Role must be student, staff or admin' });
+    }
+    if (status && !STATUSES.includes(status)) {
+      return res.status(400).json({ message: "Status must be either 'active' or 'inactive'" });
+    }
+
+    // An admin must not lock themselves out by demoting or deactivating their own account.
+    if (user._id.toString() === req.user._id.toString()) {
+      if ((role && role !== 'admin') || status === 'inactive') {
+        return res.status(400).json({ message: 'You cannot change your own role or deactivate your own account.' });
+      }
     }
 
     if (name) user.name = name;
@@ -105,7 +131,7 @@ const updateUser = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to update user: ${error.message}` });
+    return sendError(res, error, 'Failed to update user');
   }
 };
 
@@ -125,6 +151,10 @@ const updateUserStatus = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    if (user._id.toString() === req.user._id.toString() && status === 'inactive') {
+      return res.status(400).json({ message: 'You cannot deactivate your own account.' });
+    }
+
     user.status = status;
     await user.save();
 
@@ -139,7 +169,7 @@ const updateUserStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to update user status: ${error.message}` });
+    return sendError(res, error, 'Failed to update user status');
   }
 };
 

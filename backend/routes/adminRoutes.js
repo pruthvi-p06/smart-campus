@@ -26,6 +26,7 @@ const { getInsightsEndpoint } = require('../controllers/aiController');
 
 const { authenticateUser } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
+const validateObjectId = require('../middleware/validateObjectId');
 
 // All routes here strictly require Admin role
 router.use(authenticateUser, authorizeRoles('admin'));
@@ -33,19 +34,19 @@ router.use(authenticateUser, authorizeRoles('admin'));
 // Admin User Management
 router.get('/users', getAllUsers);
 router.post('/users', createUser);
-router.put('/users/:id', updateUser);
-router.put('/users/:id/status', updateUserStatus);
+router.put('/users/:id', validateObjectId, updateUser);
+router.put('/users/:id/status', validateObjectId, updateUserStatus);
 
 // Admin Issue Management
 router.get('/issues', getAdminIssues);
-router.get('/issues/:id', getIssueById);
-router.put('/issues/:id', updateAdminIssue);
+router.get('/issues/:id', validateObjectId, getIssueById);
+router.put('/issues/:id', validateObjectId, updateAdminIssue);
 
 // Admin Resource Management
 router.get('/resources', getAllResources);
 router.post('/resources', createResource);
-router.put('/resources/:id', updateResource);
-router.delete('/resources/:id', deleteResource);
+router.put('/resources/:id', validateObjectId, updateResource);
+router.delete('/resources/:id', validateObjectId, deleteResource);
 
 // Admin Analytics & AI Insights
 router.get('/analytics', getAdminAnalytics);

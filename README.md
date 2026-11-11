@@ -34,11 +34,13 @@ Do not commit `.env` files or share API keys.
 
 ## Final setup notes
 
-- Student, Staff and Admin accounts are created through the website registration pages.
+- Student and Staff accounts are created through the website registration page.
+- Admin accounts need the `ADMIN_INVITE_CODE` from `backend/.env` (entered on the *Create admin account* page). If it is empty, admin self-registration is disabled; use `node createAdmin.js` or ask an existing admin to create the account.
 - Registration creates the account in MongoDB and signs the user in immediately.
 - The project does not create default/demo accounts, sample issues, sample resources or sample notifications.
 - `backend/seed.js` is intentionally a safe no-op; it does not erase or populate your database.
-- Copy `backend/.env.example` to `backend/.env` and fill in your own MongoDB URI and a strong JWT_SECRET. Never commit or share `.env`.
+- Copy `backend/.env.example` to `backend/.env` and fill in `MONGO_URI`, a strong `JWT_SECRET` (16+ chars) and `ADMIN_INVITE_CODE`. The server refuses to start without MONGO_URI / JWT_SECRET. Never commit or share `.env`.
+- Requires Node.js 18 or newer.
 - The first run starts with empty dashboards until users submit issues or an administrator creates resources.
 - Local frontend ports 5173 and 5174 are allowed by the backend CORS configuration.
 

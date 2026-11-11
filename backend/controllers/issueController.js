@@ -1,6 +1,11 @@
+const sendError = require('../utils/sendError');
 const Issue = require('../models/Issue');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const { analyzeIssue } = require('../services/aiService');
+
+const STATUSES = ['Pending', 'In Progress', 'Resolved'];
+const PRIORITIES = ['Low', 'Medium', 'High'];
 
 // Helper to notify user
 const createNotification = async ({ userId, message, type, issueId }) => {
@@ -36,17 +41,32 @@ const createIssue = async (req, res) => {
   try {
     const { title, category, location, department, description, priority } = req.body;
 
-    if (!title || !category || !location || !description) {
+    const isText = (v) => typeof v === 'string' && v.trim() !== '';
+    if (!isText(title) || !isText(category) || !isText(location) || !isText(description)) {
       return res.status(400).json({
         message: 'Please provide all required fields: title, category, location, and description',
       });
+    }
+    if (priority !== undefined && priority !== '' && !PRIORITIES.includes(priority)) {
+      return res.status(400).json({ message: 'Priority must be Low, Medium or High' });
+    }
+
+    // The report form does not ask for a priority, so suggest one from the description.
+    let finalPriority = priority;
+    if (!finalPriority) {
+      try {
+        finalPriority = (await analyzeIssue(`${title} ${description}`)).priority;
+      } catch {
+        finalPriority = 'Medium';
+      }
+      if (!PRIORITIES.includes(finalPriority)) finalPriority = 'Medium';
     }
 
     // Determine image path (from uploaded file or request body URL)
     let imageUrl = '';
     if (req.file) {
       imageUrl = `/uploads/${req.file.filename}`;
-    } else if (req.body.image) {
+    } else if (typeof req.body.image === 'string') {
       imageUrl = req.body.image;
     }
 
@@ -54,10 +74,10 @@ const createIssue = async (req, res) => {
       title,
       category,
       location,
-      department: department || req.user.department || '',
+      department: (typeof department === 'string' && department) || req.user.department || '',
       description,
       image: imageUrl,
-      priority: priority || 'Medium',
+      priority: finalPriority,
       status: 'Pending',
       reportedBy: req.user._id,
       reportedAt: new Date(),
@@ -77,7 +97,7 @@ const createIssue = async (req, res) => {
       issue: populatedIssue,
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to create issue: ${error.message}` });
+    return sendError(res, error, 'Failed to create issue');
   }
 };
 
@@ -92,7 +112,7 @@ const getMyIssues = async (req, res) => {
 
     return res.status(200).json(issues);
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch issues: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch issues');
   }
 };
 
@@ -120,7 +140,7 @@ const getIssueById = async (req, res) => {
 
     return res.status(200).json(issue);
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch issue details: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch issue details');
   }
 };
 
@@ -135,7 +155,7 @@ const getStaffIssues = async (req, res) => {
 
     return res.status(200).json(issues);
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch staff issues: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch staff issues');
   }
 };
 
@@ -144,7 +164,7 @@ const getStaffIssues = async (req, res) => {
 // @access  Private (Staff / Admin)
 const updateIssueStatusByStaff = async (req, res) => {
   try {
-    const { status, resolutionNote } = req.body;
+    const { status, resolutionNote, staffUpdate } = req.body;
     const issue = await Issue.findById(req.params.id);
 
     if (!issue) {
@@ -160,18 +180,23 @@ const updateIssueStatusByStaff = async (req, res) => {
     }
 
     if (status) {
-      if (!['Pending', 'In Progress', 'Resolved'].includes(status)) {
+      if (!STATUSES.includes(status)) {
         return res.status(400).json({ message: 'Invalid status value. Must be Pending, In Progress, or Resolved.' });
       }
       issue.status = status;
     }
 
-    if (resolutionNote !== undefined) {
+    if (typeof resolutionNote === 'string') {
       issue.resolutionNote = resolutionNote;
     }
+    if (typeof staffUpdate === 'string') {
+      issue.staffUpdate = staffUpdate;
+    }
 
-    if (status === 'Resolved') {
-      issue.resolvedAt = new Date();
+    if (issue.status === 'Resolved') {
+      if (!issue.resolvedAt) issue.resolvedAt = new Date();
+    } else {
+      issue.resolvedAt = null;
     }
 
     await issue.save();
@@ -202,7 +227,7 @@ const updateIssueStatusByStaff = async (req, res) => {
       issue: updatedIssue,
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to update status: ${error.message}` });
+    return sendError(res, error, 'Failed to update status');
   }
 };
 
@@ -219,10 +244,11 @@ const getAdminIssues = async (req, res) => {
     if (priority) query.priority = priority;
     if (category) query.category = category;
     if (department) query.department = department;
-    if (location) query.location = { $regex: location, $options: 'i' };
+    const escapeRegex = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (location) query.location = { $regex: escapeRegex(location), $options: 'i' };
 
     if (search) {
-      const searchRegex = { $regex: search, $options: 'i' };
+      const searchRegex = { $regex: escapeRegex(search), $options: 'i' };
       query.$or = [
         { title: searchRegex },
         { description: searchRegex },
@@ -238,7 +264,7 @@ const getAdminIssues = async (req, res) => {
 
     return res.status(200).json(issues);
   } catch (error) {
-    return res.status(500).json({ message: `Failed to fetch admin issues: ${error.message}` });
+    return sendError(res, error, 'Failed to fetch admin issues');
   }
 };
 
@@ -254,10 +280,21 @@ const updateAdminIssue = async (req, res) => {
       return res.status(404).json({ message: 'Issue not found' });
     }
 
-    if (status) issue.status = status;
-    if (priority) issue.priority = priority;
-    if (adminNote !== undefined) issue.adminNote = adminNote;
+    if (status) {
+      if (!STATUSES.includes(status)) {
+        return res.status(400).json({ message: 'Invalid status value. Must be Pending, In Progress, or Resolved.' });
+      }
+      issue.status = status;
+    }
+    if (priority) {
+      if (!PRIORITIES.includes(priority)) {
+        return res.status(400).json({ message: 'Priority must be Low, Medium or High' });
+      }
+      issue.priority = priority;
+    }
+    if (typeof adminNote === 'string') issue.adminNote = adminNote;
 
+    const previousAssignee = issue.assignedTo ? issue.assignedTo.toString() : null;
     let assignedStaffUser = null;
     if (assignedTo !== undefined) {
       if (assignedTo === null || assignedTo === '') {
@@ -285,10 +322,16 @@ const updateAdminIssue = async (req, res) => {
       }
     }
 
+    if (issue.status === 'Resolved') {
+      if (!issue.resolvedAt) issue.resolvedAt = new Date();
+    } else {
+      issue.resolvedAt = null;
+    }
+
     await issue.save();
 
     // If assigned to staff, notify that staff member
-    if (assignedStaffUser) {
+    if (assignedStaffUser && assignedStaffUser._id.toString() !== previousAssignee) {
       await createNotification({
         userId: assignedStaffUser._id,
         message: `You have been assigned issue: "${issue.title}" at ${issue.location}.`,
@@ -314,7 +357,7 @@ const updateAdminIssue = async (req, res) => {
       issue: updatedIssue,
     });
   } catch (error) {
-    return res.status(500).json({ message: `Failed to update admin issue: ${error.message}` });
+    return sendError(res, error, 'Failed to update admin issue');
   }
 };
 

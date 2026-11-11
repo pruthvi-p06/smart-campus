@@ -213,7 +213,6 @@ function Register() {
               <option value="">Select your role</option>
               <option value="student">Student</option>
               <option value="staff">Staff</option>
-              <option value="admin">Administrator</option>
             </select>
           </div>
 
