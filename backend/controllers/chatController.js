@@ -63,8 +63,8 @@ const fetchCampusDataContext = async (message, user) => {
         const target = mentionedDept
           ? `${mentionedDept.toUpperCase()} department`
           : mentionedCategory
-          ? `${mentionedCategory} category`
-          : 'campus-wide';
+            ? `${mentionedCategory} category`
+            : 'campus-wide';
         return {
           type: 'restricted',
           summary: `Access Restricted: As a staff technician, you cannot view all issues for ${target}. Your access is strictly restricted to tasks assigned directly to your personal queue under Assigned Issues.`,
@@ -182,8 +182,8 @@ const fetchCampusDataContext = async (message, user) => {
         const target = mentionedDept
           ? `${mentionedDept.toUpperCase()} department`
           : mentionedCategory
-          ? `${mentionedCategory} category`
-          : 'department-wide or campus-wide';
+            ? `${mentionedCategory} category`
+            : 'department-wide or campus-wide';
         return {
           type: 'restricted',
           summary: `Access Restricted: As a student, you cannot view ${target} complaints. Your access is strictly scoped to complaints you personally reported under My Issues.`,
@@ -256,10 +256,10 @@ const fetchCampusDataContext = async (message, user) => {
             const updateText = iss.resolutionNote
               ? `Staff Note: "${iss.resolutionNote}"`
               : iss.status === 'Resolved'
-              ? 'Marked Resolved by technician'
-              : iss.status === 'In Progress'
-              ? 'Technician is actively working on this issue'
-              : 'Awaiting inspection';
+                ? 'Marked Resolved by technician'
+                : iss.status === 'In Progress'
+                  ? 'Technician is actively working on this issue'
+                  : 'Awaiting inspection';
             return `  ${i + 1}. "${iss.title}" [${iss.category || 'General'}] at ${iss.location || 'Campus'} — Status: ${iss.status}, Priority: ${iss.priority} | ${staffAssigned} | ${updateText}`;
           })
           .join('\n');
@@ -391,13 +391,13 @@ const fetchCampusDataContext = async (message, user) => {
 
         const sampleText = sampleIssues.length
           ? sampleIssues
-              .map((iss) => {
-                const assigned = iss.assignedTo?.name
-                  ? `Assigned: ${iss.assignedTo.name}`
-                  : 'Unassigned';
-                return `  - "${iss.title}" [${iss.category || 'General'}] at ${iss.location || 'Campus'} (${iss.priority} Priority, Status: ${iss.status}, ${assigned})`;
-              })
-              .join('\n')
+            .map((iss) => {
+              const assigned = iss.assignedTo?.name
+                ? `Assigned: ${iss.assignedTo.name}`
+                : 'Unassigned';
+              return `  - "${iss.title}" [${iss.category || 'General'}] at ${iss.location || 'Campus'} (${iss.priority} Priority, Status: ${iss.status}, ${assigned})`;
+            })
+            .join('\n')
           : '  (No matching tickets recorded in the system)';
 
         const summary = `Live Database Records for [${scopeLabel}]:
@@ -569,10 +569,10 @@ You currently have 0 complaints matching "${filterDesc}".
         const updateRemark = iss.resolutionNote
           ? `\n     💬 Staff Remark: "${iss.resolutionNote}"`
           : iss.status === 'In Progress'
-          ? '\n     🔄 Status Update: A technician is currently working on this issue.'
-          : iss.status === 'Resolved'
-          ? '\n     ✅ Status Update: Issue marked resolved by staff.'
-          : '\n     ⏳ Status Update: Ticket submitted, waiting for technician assignment.';
+            ? '\n     🔄 Status Update: A technician is currently working on this issue.'
+            : iss.status === 'Resolved'
+              ? '\n     ✅ Status Update: Issue marked resolved by staff.'
+              : '\n     ⏳ Status Update: Ticket submitted, waiting for technician assignment.';
 
         return `  ${i + 1}. "${iss.title}" [${iss.category || 'General'}] at ${iss.location || 'Campus'}
      Status: ${iss.status} | Priority: ${iss.priority}${staffAssigned}${updateRemark}`;
@@ -600,21 +600,21 @@ No reported issues currently recorded under ${scopeLabel} in the campus database
 
     const sampleList = sampleIssues.length
       ? sampleIssues
-          .map((iss) => {
-            const assigned = iss.assignedTo?.name
-              ? `Assigned: ${iss.assignedTo.name}`
-              : 'Unassigned';
-            return `  • "${iss.title}" [${iss.category || 'General'}] at ${iss.location || 'Campus'} — Status: ${iss.status}, Priority: ${iss.priority} (${assigned})`;
-          })
-          .join('\n')
+        .map((iss) => {
+          const assigned = iss.assignedTo?.name
+            ? `Assigned: ${iss.assignedTo.name}`
+            : 'Unassigned';
+          return `  • "${iss.title}" [${iss.category || 'General'}] at ${iss.location || 'Campus'} — Status: ${iss.status}, Priority: ${iss.priority} (${assigned})`;
+        })
+        .join('\n')
       : '  • No recent tickets available.';
 
     const recommendation =
       highPriority > 0
         ? `⚠️ Urgent Action: Prioritize assigning the ${highPriority} high-priority ticket(s) to staff technicians immediately.`
         : pending > 0
-        ? `💡 Operational Suggestion: Review and assign the ${pending} pending ticket(s) to improve the current ${resolutionRate}% resolution rate.`
-        : `✅ Optimal Performance: All tickets in ${scopeLabel} have been addressed or resolved.`;
+          ? `💡 Operational Suggestion: Review and assign the ${pending} pending ticket(s) to improve the current ${resolutionRate}% resolution rate.`
+          : `✅ Optimal Performance: All tickets in ${scopeLabel} have been addressed or resolved.`;
 
     return `📊 Issue Analysis for ${scopeLabel}:
 • Total Issues: ${total}
@@ -682,8 +682,8 @@ Visit the Resources tab in your dashboard to view complete availability schedule
   return user?.role === 'admin'
     ? 'I can assist with admin workflows: reviewing department-specific issue analysis, managing campus issues, and assigning technicians. Ask me to "analyse issues in ECE dept" or "overview of pending issues".'
     : user?.role === 'staff'
-    ? 'I can assist with your assigned maintenance workload. Ask me "what issues are pending?", "my high priority tasks", or "campus resources".'
-    : 'I can assist with SmartCampus basics: reporting an issue, tracking ticket status, and checking campus resources. What do you need help with?';
+      ? 'I can assist with your assigned maintenance workload. Ask me "what issues are pending?", "my high priority tasks", or "campus resources".'
+      : 'I can assist with SmartCampus basics: reporting an issue, tracking ticket status, and checking campus resources. What do you need help with?';
 };
 
 const askCampusAssistant = async (req, res) => {
@@ -727,13 +727,13 @@ const askCampusAssistant = async (req, res) => {
 
     const history = Array.isArray(req.body?.history)
       ? req.body.history
-          .slice(-MAX_HISTORY_ITEMS)
-          .filter(
-            (item) =>
-              item &&
-              ['user', 'assistant'].includes(item.role) &&
-              typeof item.text === 'string'
-          )
+        .slice(-MAX_HISTORY_ITEMS)
+        .filter(
+          (item) =>
+            item &&
+            ['user', 'assistant'].includes(item.role) &&
+            typeof item.text === 'string'
+        )
       : [];
 
     let geminiFailed = false;
@@ -756,11 +756,13 @@ const askCampusAssistant = async (req, res) => {
         parts: [{ text: message }],
       });
 
-      // Candidate fallback list: configured model -> stable flash models
+      // Candidate fallback list: configured model -> latest active flash models
       const candidateModels = [
         process.env.GEMINI_MODEL,
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
+        'gemini-flash-lite-latest',
+        'gemini-3.1-flash-lite',
+        'gemini-3.5-flash-lite',
+        'gemini-3.8-flash',
       ].filter(Boolean);
 
       const uniqueModels = [...new Set(candidateModels)];
