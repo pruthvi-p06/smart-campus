@@ -1760,39 +1760,37 @@ function AdminResources() {
    ANALYTICS
 ========================================================= */
 function AdminAnalytics() {
-  const [analytics, setAnalytics] =
-    useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [insights, setInsights] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [departmentFilter, setDepartmentFilter] = useState("All");
+  const [dateRangeFilter, setDateRangeFilter] = useState("all");
 
-  const [insights, setInsights] =
-    useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (overrides = {}) => {
     try {
       setLoading(true);
       setError("");
 
-      const response =
-        await getAnalytics();
+      const currentFilters = {
+        category: overrides.category !== undefined ? overrides.category : categoryFilter,
+        department: overrides.department !== undefined ? overrides.department : departmentFilter,
+        dateRange: overrides.dateRange !== undefined ? overrides.dateRange : dateRangeFilter,
+      };
 
+      const response = await getAnalytics(currentFilters);
       setAnalytics(response);
 
       try {
-        const insightResponse =
-          await generateInsights();
-
-        setInsights(
-          insightResponse.insights || []
-        );
+        const insightResponse = await generateInsights({
+          filters: currentFilters,
+        });
+        setInsights(insightResponse.insights || []);
       } catch {
         setInsights([]);
       }
-
     } catch (err) {
       setError(
         err.message ||
@@ -1889,6 +1887,87 @@ function AdminAnalytics() {
             ⚠ {error}
           </div>
         )}
+
+        {/* ANALYTICS DYNAMIC FILTERS */}
+        <div className="issue-filters" style={{ marginBottom: "24px", gap: "16px", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div className="status-filter">
+            <label htmlFor="analytics-category">Filter Category</label>
+            <select
+              id="analytics-category"
+              value={categoryFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setCategoryFilter(val);
+                fetchAnalytics({ category: val });
+              }}
+            >
+              <option value="All">All Categories</option>
+              <option value="Electrical">Electrical</option>
+              <option value="Plumbing">Plumbing</option>
+              <option value="Classroom">Classroom</option>
+              <option value="Network">Network</option>
+              <option value="Cleanliness">Cleanliness</option>
+              <option value="Equipment">Equipment</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div className="status-filter">
+            <label htmlFor="analytics-department">Filter Department</label>
+            <select
+              id="analytics-department"
+              value={departmentFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDepartmentFilter(val);
+                fetchAnalytics({ department: val });
+              }}
+            >
+              <option value="All">All Departments</option>
+              <option value="CSE">CSE</option>
+              <option value="AIML">CSE-AIML</option>
+              <option value="ISE">ISE</option>
+              <option value="ECE">ECE</option>
+              <option value="EEE">EEE</option>
+              <option value="Administration">Administration</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div className="status-filter">
+            <label htmlFor="analytics-daterange">Date Window</label>
+            <select
+              id="analytics-daterange"
+              value={dateRangeFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                setDateRangeFilter(val);
+                fetchAnalytics({ dateRange: val });
+              }}
+            >
+              <option value="all">All Time</option>
+              <option value="7d">Last 7 Days</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="90d">Last 90 Days</option>
+            </select>
+          </div>
+
+          {(categoryFilter !== "All" || departmentFilter !== "All" || dateRangeFilter !== "all") && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                setCategoryFilter("All");
+                setDepartmentFilter("All");
+                setDateRangeFilter("all");
+                fetchAnalytics({ category: "All", department: "All", dateRange: "all" });
+              }}
+              style={{ paddingBottom: "10px", color: "#2563eb", fontWeight: "600" }}
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
 
         {/* KPI */}
 

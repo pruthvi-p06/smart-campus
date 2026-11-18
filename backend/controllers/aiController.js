@@ -1,4 +1,5 @@
 const { analyzeIssue, generateInsights } = require('../services/aiService');
+const { buildAnalyticsFilter } = require('./analyticsController');
 const Issue = require('../models/Issue');
 const User = require('../models/User');
 
@@ -26,21 +27,25 @@ const analyzeIssueEndpoint = async (req, res) => {
   }
 };
 
-// @desc    Generate strategic operational insights from live database
+// @desc    Generate strategic operational insights from live or filtered database view
 // @route   POST /api/ai/insights
 // @access  Private (Admin)
 const getInsightsEndpoint = async (req, res) => {
   try {
-    const totalIssues = await Issue.countDocuments();
-    const pending = await Issue.countDocuments({ status: 'Pending' });
-    const inProgress = await Issue.countDocuments({ status: 'In Progress' });
-    const resolved = await Issue.countDocuments({ status: 'Resolved' });
-    const highPriority = await Issue.countDocuments({ priority: 'High' });
+    const rawFilters = req.body?.filters || req.body || {};
+    const match = buildAnalyticsFilter(rawFilters);
+
+    const totalIssues = await Issue.countDocuments(match);
+    const pending = await Issue.countDocuments({ ...match, status: 'Pending' });
+    const inProgress = await Issue.countDocuments({ ...match, status: 'In Progress' });
+    const resolved = await Issue.countDocuments({ ...match, status: 'Resolved' });
+    const highPriority = await Issue.countDocuments({ ...match, priority: 'High' });
     const activeStaff = await User.countDocuments({ role: 'staff', status: 'active' });
 
     const resolutionRate = totalIssues > 0 ? Math.round((resolved / totalIssues) * 100) : 0;
 
     const categoryAgg = await Issue.aggregate([
+      ...(Object.keys(match).length > 0 ? [{ $match: match }] : []),
       { $group: { _id: '$category', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
@@ -50,6 +55,7 @@ const getInsightsEndpoint = async (req, res) => {
     });
 
     const statusAgg = await Issue.aggregate([
+      ...(Object.keys(match).length > 0 ? [{ $match: match }] : []),
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
     const issuesByStatus = {};
@@ -67,6 +73,12 @@ const getInsightsEndpoint = async (req, res) => {
       activeStaff,
       issuesByCategory,
       issuesByStatus,
+      filters: {
+        category: rawFilters.category || 'All',
+        department: rawFilters.department || 'All',
+        status: rawFilters.status || 'All',
+        dateRange: rawFilters.dateRange || 'all',
+      },
     };
 
     const aiInsights = await generateInsights(analyticsData);

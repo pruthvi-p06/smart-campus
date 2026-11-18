@@ -150,8 +150,13 @@ export const updateProfile = (profileData) =>
 
 // ==================== ANALYTICS ====================
 
-export const getAnalytics = () =>
-  request("/admin/analytics");
+export const getAnalytics = (params = {}) => {
+  const clean = Object.entries(params).filter(
+    ([_, v]) => v && v !== "All" && v !== "all"
+  );
+  const query = new URLSearchParams(clean).toString();
+  return request(`/admin/analytics${query ? `?${query}` : ""}`);
+};
 
 export const generateInsights = (data = {}) =>
   request("/admin/insights", {

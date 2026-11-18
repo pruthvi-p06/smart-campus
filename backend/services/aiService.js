@@ -139,11 +139,44 @@ const analyzeIssue = async (description = '') => {
  * Generate high-level insights for administrators based on actual database metrics
  */
 const generateInsights = async (analyticsData) => {
-  const { totalIssues = 0, pending = 0, highPriority = 0, resolutionRate = 0, issuesByCategory = {}, issuesByStatus = {} } = analyticsData;
+  const {
+    totalIssues = 0,
+    pending = 0,
+    highPriority = 0,
+    resolutionRate = 0,
+    issuesByCategory = {},
+    issuesByStatus = {},
+    filters = {},
+  } = analyticsData;
 
   const insights = [];
 
-  // Top category detection
+  const filterParts = [
+    filters.category && filters.category !== 'All' ? `Category: ${filters.category}` : null,
+    filters.department && filters.department !== 'All' ? `Dept: ${filters.department}` : null,
+    filters.status && filters.status !== 'All' ? `Status: ${filters.status}` : null,
+    filters.dateRange === '7d' ? 'Last 7 Days' : filters.dateRange === '30d' ? 'Last 30 Days' : filters.dateRange === '90d' ? 'Last 90 Days' : null,
+  ].filter(Boolean);
+
+  const scopeLabel = filterParts.length > 0 ? `Filtered View (${filterParts.join(', ')})` : 'Campus-Wide Overview';
+
+  // Handle zero-record dataset gracefully
+  if (totalIssues === 0) {
+    return {
+      summary: `No complaint records found matching ${scopeLabel}. Operational area is currently clear.`,
+      generatedAt: new Date().toISOString(),
+      insights: [
+        {
+          type: 'empty_scope',
+          title: `Zero Issues Found (${scopeLabel})`,
+          detail: 'No complaints or maintenance records match the currently selected filter parameters. Try widening the date range or choosing All Categories.',
+          urgency: 'Low',
+        },
+      ],
+    };
+  }
+
+  // Top category concentration within current filtered scope
   let topCategory = 'None';
   let topCategoryCount = 0;
   for (const [cat, count] of Object.entries(issuesByCategory)) {
@@ -154,44 +187,45 @@ const generateInsights = async (analyticsData) => {
   }
 
   if (topCategoryCount > 0) {
+    const catPercent = Math.round((topCategoryCount / totalIssues) * 100);
     insights.push({
       type: 'category_trend',
-      title: 'Highest Issue Frequency',
-      detail: `${topCategory} accounts for ${Math.round((topCategoryCount / (totalIssues || 1)) * 100)}% of reported tickets (${topCategoryCount} tickets). Prioritize staff allocation to ${topCategory} maintenance.`,
-      urgency: 'Medium',
+      title: `${topCategory} Concentration (${scopeLabel})`,
+      detail: `${topCategory} represents ${catPercent}% (${topCategoryCount} of ${totalIssues}) of recorded tickets in this scope. Suggest prioritizing support staff allocation to ${topCategory} maintenance.`,
+      urgency: catPercent >= 40 ? 'High' : 'Medium',
     });
   }
 
   // High priority ratio
   if (highPriority > 0) {
-    const highRatio = Math.round((highPriority / (totalIssues || 1)) * 100);
+    const highRatio = Math.round((highPriority / totalIssues) * 100);
     insights.push({
       type: 'priority_warning',
-      title: 'High Priority Escalations',
-      detail: `${highPriority} issues (${highRatio}% of total) are marked High Priority. Immediate inspection recommended to prevent academic disruption.`,
+      title: `Critical Escalation Alert (${highRatio}% High Priority)`,
+      detail: `${highPriority} of ${totalIssues} tickets in this scope are marked High Priority. Immediate inspection recommended to prevent operational or safety disruptions.`,
       urgency: highRatio > 25 ? 'High' : 'Medium',
     });
   }
 
-  // Pending vs Resolution
+  // Pending vs Resolution performance
   if (pending > 0 && resolutionRate < 60) {
     insights.push({
       type: 'backlog_alert',
-      title: 'Backlog Action Required',
-      detail: `Current resolution rate is ${resolutionRate}%, with ${pending} tickets awaiting assignment or initial response. Recommend assigning unassigned staff.`,
+      title: `Backlog Action Required (${pending} Tickets Pending)`,
+      detail: `Current resolution rate is ${resolutionRate}%, with ${pending} tickets awaiting action. Recommend reassigning unallocated staff to clear the queue.`,
       urgency: 'High',
     });
-  } else if (resolutionRate >= 75) {
+  } else if (resolutionRate >= 70) {
     insights.push({
       type: 'performance_positive',
-      title: 'Healthy Resolution Velocity',
-      detail: `Campus maintenance teams maintain a ${resolutionRate}% resolution rate. Issue turnover is currently within target parameters.`,
+      title: `Healthy Resolution Velocity (${resolutionRate}% Resolved)`,
+      detail: `Maintenance teams are maintaining a ${resolutionRate}% resolution rate across this operational slice. Ticket turnover aligns with campus performance targets.`,
       urgency: 'Low',
     });
   }
 
   return {
-    summary: `Analysis computed across ${totalIssues} campus issues. Current operational status is ${pending > 10 ? 'CONGESTED' : 'STABLE'}.`,
+    summary: `Data-grounded analysis for ${scopeLabel}: ${totalIssues} tickets analyzed. Operational state: ${pending > 5 || highPriority > 3 ? 'ATTENTION REQUIRED' : 'STABLE'}.`,
     generatedAt: new Date().toISOString(),
     insights,
   };
