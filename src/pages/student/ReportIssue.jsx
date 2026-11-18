@@ -8,6 +8,7 @@ function ReportIssue() {
     category: "",
     location: "",
     department: "",
+    priority: "Medium",
     description: "",
     image: null
   });
@@ -72,6 +73,7 @@ function ReportIssue() {
       issueData.append("category", formData.category);
       issueData.append("location", formData.location);
       issueData.append("department", formData.department);
+      issueData.append("priority", formData.priority);
       issueData.append("description", formData.description.trim());
 
       if (formData.image) {
@@ -87,6 +89,7 @@ function ReportIssue() {
         category: "",
         location: "",
         department: "",
+        priority: "Medium",
         description: "",
         image: null
       });
@@ -286,6 +289,27 @@ function ReportIssue() {
                 Other
               </option>
 
+            </select>
+
+          </div>
+
+          {/* Priority */}
+          <div className="form-group">
+
+            <label htmlFor="priority">
+              Priority
+            </label>
+
+            <select
+              id="priority"
+              name="priority"
+              value={formData.priority}
+              onChange={handleChange}
+              disabled={loading}
+            >
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
             </select>
 
           </div>

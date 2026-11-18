@@ -3,7 +3,8 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables
+// Load environment variables (explicitly resolve backend/.env regardless of execution folder)
+dotenv.config({ path: path.join(__dirname, '.env') });
 dotenv.config();
 
 // Fail fast with a clear message instead of failing later on the first login.

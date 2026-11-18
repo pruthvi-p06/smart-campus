@@ -92,6 +92,14 @@ function Profile() {
         role: data.role || prev.role
       }));
 
+      const currentUser = JSON.parse(
+        localStorage.getItem("user") || "{}"
+      );
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ ...currentUser, ...data })
+      );
+
       setSuccess("Profile updated successfully!");
     } catch (err) {
       setError(err.message || "Failed to update profile.");

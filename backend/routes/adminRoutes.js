@@ -12,6 +12,7 @@ const {
   getAdminIssues,
   getIssueById,
   updateAdminIssue,
+  deleteAdminIssue,
 } = require('../controllers/issueController');
 
 const {
@@ -41,6 +42,7 @@ router.put('/users/:id/status', validateObjectId, updateUserStatus);
 router.get('/issues', getAdminIssues);
 router.get('/issues/:id', validateObjectId, getIssueById);
 router.put('/issues/:id', validateObjectId, updateAdminIssue);
+router.delete('/issues/:id', validateObjectId, deleteAdminIssue);
 
 // Admin Resource Management
 router.get('/resources', getAllResources);

@@ -65,6 +65,21 @@ function Resources() {
     return "🏫";
   };
 
+  const categories = [
+    ...new Set([
+      "Academic",
+      "Laboratory",
+      "Facility",
+      "Health",
+      "Sports",
+      "Library",
+      "Cafeteria",
+      "Hostel",
+      "IT & Network",
+      ...resources.map((r) => r.category).filter(Boolean),
+    ]),
+  ];
+
   return (
     <DashboardLayout>
 
@@ -114,11 +129,11 @@ function Resources() {
           >
 
             <option value="All">All</option>
-            <option value="Academic">Academic</option>
-            <option value="Laboratory">Laboratory</option>
-            <option value="Facility">Facility</option>
-            <option value="Health">Health</option>
-            <option value="Sports">Sports</option>
+            {categories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
 
           </select>
 
@@ -170,12 +185,12 @@ function Resources() {
 
                   <span
                     className={`availability ${
-                      (resource.availability || "")
+                      (resource.status || resource.availability || "")
                         .toLowerCase()
                         .replace(" ", "-")
                     }`}
                   >
-                    {resource.availability || "Available"}
+                    {resource.status || resource.availability || "Available"}
                   </span>
 
                 </div>

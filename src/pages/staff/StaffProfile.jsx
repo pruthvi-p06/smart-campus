@@ -72,6 +72,14 @@ function StaffProfile() {
         updatedProfile.department || department
       );
 
+      const currentUser = JSON.parse(
+        localStorage.getItem("user") || "{}"
+      );
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ ...currentUser, ...updatedProfile })
+      );
+
       setSuccessMessage(
         "Profile updated successfully!"
       );

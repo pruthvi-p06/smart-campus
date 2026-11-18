@@ -371,7 +371,9 @@ function IssueDetails() {
           </h2>
 
           <p>
-            {issue.resolution ||
+            {issue.resolutionNote ||
+              issue.staffUpdate ||
+              issue.resolution ||
               issue.resolutionNotes ||
               "No staff update yet."}
           </p>
