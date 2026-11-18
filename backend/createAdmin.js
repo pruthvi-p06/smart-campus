@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const User = require('./models/User');
 
+dotenv.config({ path: require('path').join(__dirname, '.env') });
 dotenv.config();
 
 async function createInitialAdmin() {

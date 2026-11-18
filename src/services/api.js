@@ -87,6 +87,11 @@ export const updateAdminIssue = (id, issueData) =>
     body: JSON.stringify(issueData),
   });
 
+export const deleteAdminIssue = (id) =>
+  request(`/admin/issues/${id}`, {
+    method: "DELETE",
+  });
+
 // ==================== ADMIN - USERS ====================
 
 export const getAdminUsers = () =>

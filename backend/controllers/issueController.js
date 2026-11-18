@@ -361,6 +361,21 @@ const updateAdminIssue = async (req, res) => {
   }
 };
 
+// @desc    Delete an issue (Admin)
+// @route   DELETE /api/admin/issues/:id
+// @access  Private (Admin)
+const deleteAdminIssue = async (req, res) => {
+  try {
+    const issue = await Issue.findByIdAndDelete(req.params.id);
+    if (!issue) {
+      return res.status(404).json({ message: 'Issue not found' });
+    }
+    return res.status(200).json({ message: 'Issue deleted successfully' });
+  } catch (error) {
+    return sendError(res, error, 'Failed to delete issue');
+  }
+};
+
 module.exports = {
   createIssue,
   getMyIssues,
@@ -369,4 +384,5 @@ module.exports = {
   updateIssueStatusByStaff,
   getAdminIssues,
   updateAdminIssue,
+  deleteAdminIssue,
 };

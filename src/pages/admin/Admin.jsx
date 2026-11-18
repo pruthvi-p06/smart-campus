@@ -1,3 +1,4 @@
+import AdminDashboard from "./AdminDashboard";
 import AdminSidebar from "../../components/AdminSidebar";
 import { getImageUrl } from "../../utils/imageUrl";
 import { useEffect, useState } from "react";
@@ -12,6 +13,7 @@ import {
   getAdminIssues,
   getAdminIssue,
   updateAdminIssue,
+  deleteAdminIssue,
 
   getAdminUsers,
   createAdminUser,
@@ -70,34 +72,51 @@ function AdminIssues() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const fetchIssues = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await getAdminIssues();
+
+      const issueList =
+        response.issues ||
+        response.data ||
+        response ||
+        [];
+
+      setIssues(
+        Array.isArray(issueList) ? issueList : []
+      );
+    } catch (err) {
+      setError(
+        err.message || "Failed to load issues."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchIssues = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const response = await getAdminIssues();
-
-        const issueList =
-          response.issues ||
-          response.data ||
-          response ||
-          [];
-
-        setIssues(
-          Array.isArray(issueList) ? issueList : []
-        );
-      } catch (err) {
-        setError(
-          err.message || "Failed to load issues."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchIssues();
   }, []);
+
+  const handleDeleteIssue = async (issueId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this issue?"
+    );
+    if (!confirmed) return;
+
+    try {
+      setError("");
+      await deleteAdminIssue(issueId);
+      await fetchIssues();
+    } catch (err) {
+      setError(
+        err.message || "Failed to delete issue."
+      );
+    }
+  };
 
   const formatStatus = (status) => {
     if (!status) return "Pending";
@@ -311,6 +330,22 @@ function AdminIssues() {
                         >
                           View
                         </Link>
+                        {" "}
+                        <button
+                          type="button"
+                          className="text-button danger"
+                          onClick={() => handleDeleteIssue(issueId)}
+                          style={{
+                            marginLeft: "8px",
+                            color: "#dc2626",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "13px"
+                          }}
+                        >
+                          Delete
+                        </button>
                       </td>
 
                     </tr>
@@ -336,8 +371,14 @@ function AdminIssues() {
    ISSUE DETAILS
 ========================================================= */
 
-function AdminIssueDetails() {
-  const { id } = useParams();
+function AdminIssueDetails({ issueId }) {
+  const { id: paramId, "*": splat } = useParams();
+  const location = useLocation();
+  const id =
+    issueId ||
+    paramId ||
+    (splat ? splat.replace(/^issues\//, "") : "") ||
+    location.pathname.split("/").filter(Boolean).pop();
 
   const [issue, setIssue] = useState(null);
   const [status, setStatus] = useState("Pending");
@@ -588,6 +629,27 @@ function AdminIssueDetails() {
 
   </div>
 )}
+
+            <div className="description-section">
+
+              <h3>
+                Resolution / Staff Update
+              </h3>
+
+              <p>
+                {issue?.resolutionNote ||
+                  issue?.staffUpdate ||
+                  issue?.resolution ||
+                  "No staff update or resolution note provided yet."}
+              </p>
+
+              {issue?.resolvedAt && (
+                <small style={{ display: "block", marginTop: "8px", color: "#64748b" }}>
+                  Resolved on: {new Date(issue.resolvedAt).toLocaleDateString()}
+                </small>
+              )}
+
+            </div>
 
           </section>
 
@@ -1284,6 +1346,7 @@ function AdminResources() {
   const [category, setCategory] = useState("Academic");
   const [location, setLocation] = useState("");
   const [status, setStatus] = useState("Available");
+  const [description, setDescription] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1325,6 +1388,7 @@ function AdminResources() {
     setCategory("Academic");
     setLocation("");
     setStatus("Available");
+    setDescription("");
     setEditingId(null);
     setShowForm(false);
   };
@@ -1345,6 +1409,7 @@ function AdminResources() {
         name: name.trim(),
         category,
         location: location.trim(),
+        description: description.trim(),
         status
       };
 
@@ -1376,6 +1441,7 @@ function AdminResources() {
     setCategory(resource.category || "Academic");
     setLocation(resource.location || "");
     setStatus(resource.status || "Available");
+    setDescription(resource.description || "");
     setShowForm(true);
     setError("");
   };
@@ -1510,6 +1576,23 @@ function AdminResources() {
                     setLocation(e.target.value)
                   }
                   placeholder="Example: Main Block"
+                />
+
+              </div>
+
+              <div className="form-group">
+
+                <label>
+                  Description
+                </label>
+
+                <textarea
+                  rows="3"
+                  value={description}
+                  onChange={(e) =>
+                    setDescription(e.target.value)
+                  }
+                  placeholder="Describe the resource and its usage..."
                 />
 
               </div>
@@ -2138,6 +2221,14 @@ function AdminProfile() {
         setPhone(updatedProfile.phone);
       }
 
+      const currentUser = JSON.parse(
+        localStorage.getItem("user") || "{}"
+      );
+      localStorage.setItem(
+        "user",
+        JSON.stringify({ ...currentUser, ...updatedProfile })
+      );
+
       setMessage(
         "Profile updated successfully!"
       );
@@ -2342,7 +2433,8 @@ function Admin() {
 
 
   if (path.startsWith("/admin/issues/")) {
-    return <AdminIssueDetails />;
+    const extractedId = path.replace("/admin/issues/", "").split("/")[0];
+    return <AdminIssueDetails issueId={extractedId} />;
   }
 
 
