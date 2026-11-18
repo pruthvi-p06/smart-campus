@@ -7,6 +7,7 @@ function AdminSidebar() {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    window.dispatchEvent(new CustomEvent("smartcampus:clear-chat"));
 
     navigate("/login", { replace: true });
   };
