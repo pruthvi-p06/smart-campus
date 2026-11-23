@@ -7,6 +7,15 @@ const MAX_MESSAGE_LENGTH = 1000;
 const MAX_HISTORY_ITEMS = 8;
 
 /**
+ * Helper: detect when the user is asking about the website, its purpose, UI, or capabilities
+ */
+const isWebsiteInquiry = (text) => {
+  return /\b(what is (this|the)?\s*(smartcampus|smart campus|website|site|web site|app|application|platform|portal)|tell (me )?about (this|the)?\s*(smartcampus|smart campus|website|site|web site|app|platform|portal)|explain (this|the)?\s*(smartcampus|smart campus|website|site|platform|app|portal)|how does this (website|site|platform|app|portal|smartcampus) work|what does this (website|site|platform|app|portal|smartcampus) do|what can i do (here|on this website|on this platform|on this app|on this site)|features of (this|the)?\s*(smartcampus|website|site|platform|app)|guide to this (website|site|platform)|walkthrough|tour of (this|the)?\s*(website|site|platform)|overview of (this|the)?\s*(website|site|platform|portal)|describe (the |this )?(ui|website|platform|portal))\b/i.test(
+    text
+  );
+};
+
+/**
  * Live Data Integration:
  * Extracts relevant application data from MongoDB based on user query and role.
  * Strictly enforces that:
@@ -18,6 +27,18 @@ const MAX_HISTORY_ITEMS = 8;
 const fetchCampusDataContext = async (message, user) => {
   try {
     const text = message.toLowerCase();
+
+    // Helper: website feature / UI overview inquiry
+    if (isWebsiteInquiry(text)) {
+      return {
+        type: 'website_overview',
+        role: user ? user.role : 'guest',
+        userName: user ? user.name : 'Visitor',
+        summary: `User is asking for an overview of the SmartCampus website, its interface, and features tailored strictly to their current role: ${
+          user ? user.role.toUpperCase() : 'UNAUTHENTICATED GUEST'
+        }. Provide a clear, structured breakdown of the UI sections and features accessible to them.`,
+      };
+    }
 
     // Helper: extract status filter
     let statusFilter = null;
@@ -301,6 +322,49 @@ const fetchCampusDataContext = async (message, user) => {
     // 3. ROLE: ADMINISTRATOR (FULL CAMPUS-WIDE & FILTERED ANALYTICS)
     // ==============================================================
     if (user?.role === 'admin') {
+      // 3.1 Check staff / technician roster inquiry
+      const isStaffInquiry =
+        /\b(staff|technician|technicians|workers|team|who can i assign|assign to whom|available staff|list staff|active staff|personnel|workforce)\b/i.test(
+          text
+        );
+
+      if (isStaffInquiry) {
+        const [staffMembers, unassignedTickets] = await Promise.all([
+          User.find({ role: 'staff' })
+            .select('name department email phone status')
+            .sort({ name: 1 }),
+          Issue.find({ assignedTo: null, status: { $ne: 'Resolved' } })
+            .select('title category department priority location status')
+            .limit(5),
+        ]);
+
+        const staffSummary = staffMembers.length
+          ? staffMembers
+              .map(
+                (s, i) =>
+                  `  ${i + 1}. "${s.name}" [Department: ${s.department || 'Maintenance'}] — Status: ${s.status || 'active'}, Phone: ${s.phone || 'N/A'}`
+              )
+              .join('\n')
+          : '  (No staff technicians currently registered in database)';
+
+        const unassignedSummary = unassignedTickets.length
+          ? unassignedTickets
+              .map(
+                (t, i) =>
+                  `  ${i + 1}. "${t.title}" [${t.category}] at ${t.location || 'Campus'} (${t.priority} Priority, Status: ${t.status})`
+              )
+              .join('\n')
+          : '  (No unassigned active tickets in database)';
+
+        return {
+          type: 'admin_staff',
+          totalStaff: staffMembers.length,
+          staffMembers,
+          unassignedTickets,
+          summary: `LIVE REGISTERED STAFF TECHNICIANS FROM MONGODB (${staffMembers.length} Total):\n${staffSummary}\n\nUNASSIGNED TICKETS IN NEED OF DISPATCH:\n${unassignedSummary}\n\nSTRICT GROUNDING INSTRUCTION: You must strictly ONLY reference the actual registered staff technicians listed above. NEVER invent, hallucinate, or use fictional names (such as characters from Arrested Development, Bluth family, or any TV show).`,
+        };
+      }
+
       const isUnassignedQuery = /\bunassigned\b|\bnot assigned\b|\bwithout technician\b/i.test(text);
 
       const isAnalysisQuery =
@@ -341,7 +405,7 @@ const fetchCampusDataContext = async (message, user) => {
 
         const scopeLabel = scopeParts.length ? scopeParts.join(' — ') : 'Campus-Wide';
 
-        let [total, pending, inProgress, resolved, highPriority, sampleIssues] =
+        let [total, pending, inProgress, resolved, highPriority, sampleIssues, activeStaffList] =
           await Promise.all([
             Issue.countDocuments(filter),
             Issue.countDocuments({ ...filter, status: 'Pending' }),
@@ -353,6 +417,9 @@ const fetchCampusDataContext = async (message, user) => {
               .limit(5)
               .select('title category department location status priority assignedTo')
               .populate('assignedTo', 'name'),
+            User.find({ role: 'staff', status: { $ne: 'inactive' } })
+              .select('name department')
+              .limit(10),
           ]);
 
         // Fallback loose match if department field was empty on documents
@@ -371,7 +438,7 @@ const fetchCampusDataContext = async (message, user) => {
           const looseTotal = await Issue.countDocuments(looseFilter);
           if (looseTotal > 0) {
             filter = looseFilter;
-            [total, pending, inProgress, resolved, highPriority, sampleIssues] =
+            [total, pending, inProgress, resolved, highPriority, sampleIssues, activeStaffList] =
               await Promise.all([
                 Issue.countDocuments(filter),
                 Issue.countDocuments({ ...filter, status: 'Pending' }),
@@ -383,6 +450,9 @@ const fetchCampusDataContext = async (message, user) => {
                   .limit(5)
                   .select('title category department location status priority assignedTo')
                   .populate('assignedTo', 'name'),
+                User.find({ role: 'staff', status: { $ne: 'inactive' } })
+                  .select('name department')
+                  .limit(10),
               ]);
           }
         }
@@ -400,13 +470,20 @@ const fetchCampusDataContext = async (message, user) => {
             .join('\n')
           : '  (No matching tickets recorded in the system)';
 
+        const staffSummary = activeStaffList.length
+          ? activeStaffList.map((s) => `${s.name} (${s.department || 'Maintenance'})`).join(', ')
+          : 'None registered yet (add staff via Users tab)';
+
         const summary = `Live Database Records for [${scopeLabel}]:
 • Total Reported Issues: ${total}
 • Status Breakdown: Pending: ${pending}, In Progress: ${inProgress}, Resolved: ${resolved}
 • High Priority Issues: ${highPriority}
 • Resolution Rate: ${resolutionRate}%
+• Registered Staff Technicians: ${staffSummary}
 • Recent Tickets in Scope:
-${sampleText}`;
+${sampleText}
+
+STRICT GROUNDING INSTRUCTION: When recommending or mentioning technicians, ONLY refer to registered staff: [${staffSummary}]. NEVER invent names or use fictional characters.`;
 
         return {
           type: 'analytics',
@@ -418,6 +495,7 @@ ${sampleText}`;
           highPriority,
           resolutionRate,
           sampleIssues,
+          activeStaffList,
           summary,
         };
       }
@@ -479,28 +557,46 @@ const buildCampusSystemInstruction = (user, dataContext) => {
 
   if (user) {
     if (user.role === 'admin') {
-      roleScope = `The user is an authenticated ADMINISTRATOR (${user.name || 'Admin'}). You can assist them with campus-wide operations: interpreting analytics & KPIs, assigning pending issues to staff technicians, managing user accounts, and managing campus resources.`;
+      roleScope = `The user is an authenticated ADMINISTRATOR (Name: "${user.name || 'Admin'}"). You assist them with campus-wide administrative workflows: reviewing live analytics & KPIs, assigning pending issues to real staff technicians, managing campus users, and managing campus resources.`;
     } else if (user.role === 'staff') {
-      roleScope = `The user is an authenticated STAFF TECHNICIAN (${user.name || 'Staff'}, Department: ${user.department || 'Maintenance'}). Assist them strictly with tasks assigned directly to their queue, updating issue resolution notes, and managing resources. STRICT PRIVACY RULE: If staff asks for department-wide issues (e.g. 'tell all issues of ECE dept') or campus-wide issues, you MUST refuse and state that staff can only view tasks assigned directly to them. Never present their personal queue as the department's issues.`;
+      roleScope = `The user is an authenticated STAFF TECHNICIAN (Name: "${user.name || 'Staff'}", Department: "${user.department || 'Maintenance'}"). Assist them strictly with tasks assigned directly to their queue, updating issue resolution notes, and checking campus resources.`;
     } else {
-      roleScope = `The user is an authenticated STUDENT (${user.name || 'Student'}). Guide them on student features: submitting campus complaints/issues, tracking their status in My Issues, viewing staff resolution updates, and checking resource availability. STRICT PRIVACY RULE: If a student asks for department-wide issues or campus-wide issues, you MUST refuse and state that students can only view their own reported complaints.`;
+      roleScope = `The user is an authenticated STUDENT (Name: "${user.name || 'Student'}", Department: "${user.department || 'General'}"). Guide them on student features: submitting campus complaints/issues, tracking their status in My Issues, viewing staff resolution updates, and checking resource availability.`;
     }
   }
 
-  let prompt = `You are the SmartCampus Assistant for a college campus issue and resource management web application. Be friendly, concise, practical, and strictly maintain role-based boundaries.
-Role Context: ${roleScope}
+  let prompt = `You are the SmartCampus Assistant, an intelligent, professional, and strictly grounded operations copilot for the SmartCampus facility issue and resource management web application.
 
-Rules:
-1. Strict Role Boundary:
-   - Staff only see tasks assigned to them; never department-wide or campus-wide logs.
-   - Students only see their own submitted complaints; never department-wide or campus-wide logs.
-   - Admins see managerial campus-wide and department-specific analytics.
-2. Anti-Hallucination Guardrail: When answering questions about issues or statistics, rely exclusively on the Live Application Data Records provided below. Do not invent arbitrary numbers.
-3. Off-Topic Refusal: If a query is unrelated to campus or SmartCampus (such as weather, general trivia, movies, sports, jokes), politely decline and redirect to campus assistance.
-4. Life Safety: If a situation involves immediate danger (fire, exposed electric wiring, serious injury), advise contacting campus security or emergency services immediately.`;
+AUTHENTICATED USER CONTEXT:
+${roleScope}
+
+STRICT ANTI-HALLUCINATION & FACTUAL GROUNDING RULES:
+1. STRICT DATABASE GROUNDING:
+   - You must NEVER invent, assume, or hallucinate names of staff members, technicians, students, administrators, departments, tickets, or facilities.
+   - Under NO circumstances should you invent names of characters from television shows, pop culture, comedy, or movies (such as Arrested Development: Gob Bluth, Buster Bluth, George Bluth, Tobias Fünke, Lindsay Bluth, etc.), even if the user or administrator is named "Michael Bluth" or similar. Treat all account names strictly as real campus personnel and NEVER make pop culture jokes or invent fictional character names.
+   - You must rely EXCLUSIVELY on the Live Application Data Records provided below from MongoDB.
+   - If asked about staff members or who can be assigned, you can ONLY mention the staff names explicitly listed in the MongoDB records below. If no staff records are present in the records below, state: "Staff technicians are managed in the Users tab of the Admin dashboard. Currently, no staff details were retrieved for this query."
+   - Never invent arbitrary statistics, ticket numbers, or resolution percentages.
+
+2. STRICT ROLE PRIVACY & ACCESS CONTROL BOUNDARIES:
+   - STAFF TECHNICIANS: Only permitted to view tickets assigned directly to their personal queue. Must NEVER be shown department-wide or campus-wide complaints or administrative KPI tools. If staff asks for department-wide or all issues, refuse and instruct them to check Assigned Issues.
+   - STUDENTS: Only permitted to view complaints they personally reported. Must NEVER be shown campus-wide logs, department-wide issues, or staff queues. If a student asks for campus-wide or department issues, refuse and instruct them to check My Issues.
+   - ADMINISTRATORS: Have full oversight of campus-wide and department-filtered analytics, ticket dispatching to staff, user accounts, and facility resources.
+   - GUESTS / VISITORS: Require authentication to access issue reporting or tracking.
+
+3. SMARTCAMPUS PLATFORM & WEBSITE KNOWLEDGE (ROLE-BASED):
+When the user asks what this website is, how the platform works, or what features are available ("what is this website", "what can I do here", "about smartcampus", "explain this platform", "features", etc.), you must provide a detailed explanation of the UI and features that are ONLY visible and accessible to the current user's role (${user ? user.role : 'unauthenticated guest'}):
+   - For STUDENTS: Explain Dashboard (active complaint counters), Report Issue (with AI category/priority prediction & photo upload), My Issues (live status tracking & staff resolution remarks), Campus Resources (lab/hall availability), and Profile. Mention that administrative analytics and technician queues are restricted to staff/admin.
+   - For STAFF TECHNICIANS: Explain Staff Dashboard (workload counters), Assigned Issues (personal task queue, updating status from Pending -> In Progress -> Resolved, adding resolution worklogs), Campus Resources, and Staff Profile.
+   - For ADMINISTRATORS: Explain Admin Dashboard (campus-wide KPI cards, resolution %, breakdown charts, and AI strategic insights), Issue Management (campus-wide ticket list, assigning tickets to staff technicians, adding admin notes), User Management (creating/editing student and staff accounts, activating/deactivating users), Resource Management (adding/editing campus facilities), and Admin Profile.
+   - For GUESTS: Explain the purpose of SmartCampus (centralized college maintenance & resource portal) and guide them to register or sign in as Student, Staff, or Admin to unlock their respective portals.
+
+4. OFF-TOPIC REFUSAL & SAFETY:
+   - If a query is unrelated to campus facilities, SmartCampus, or campus operations (e.g. weather, sports, general trivia, recipes, movies), politely decline and steer back to campus assistance.
+   - If an issue involves immediate physical danger (fire, gas leak, active electric shock/sparking, building collapse), advise contacting campus emergency services or security immediately.`;
 
   if (dataContext?.summary) {
-    prompt += `\n\nLive Application Data Records from MongoDB:\n${dataContext.summary}\n\nInstructions: Answer the user's inquiry directly using these records. Respect role boundaries strictly. If dataContext indicates Access Restricted, clearly inform the user of the restriction.`;
+    prompt += `\n\nLIVE APPLICATION DATA RECORDS FROM MONGODB:\n${dataContext.summary}\n\nInstructions: Answer the user's inquiry directly using these records. Rely only on the facts and names above.`;
   }
 
   return prompt;
@@ -519,7 +615,113 @@ const getFallbackReply = (message, user = null, dataContext = null) => {
     return `🔒 ${dataContext.summary}`;
   }
 
-  // 2. Staff Assigned Tasks (Strictly scoped to that staff member's queue)
+  // 2. Website Overview & Role Tour
+  if (dataContext?.type === 'website_overview' || isWebsiteInquiry(text)) {
+    if (user?.role === 'student') {
+      return `🎓 **Welcome to SmartCampus — Student Portal**
+
+SmartCampus is your central platform for reporting campus infrastructure issues, monitoring repair progress, and discovering facility availability.
+
+Here is an overview of the UI and features available on your student account:
+• **Dashboard (/student/dashboard)**: Live summary cards of your active requests (Pending, In Progress, Resolved) and shortcuts to campus services.
+• **Report Issue (/student/report-issue)**: Submit facility problems (Electrical, Network/WiFi, Plumbing, Cleanliness, Classroom).
+  - *Smart Issue AI*: Automatically analyzes your description to suggest category & priority with 1-click apply.
+  - *Photo Upload*: Attach photos so technicians can locate and assess the damage.
+• **My Issues (/student/my-issues)**: Track all tickets you personally submitted. View live status badges and read technician updates and resolution notes.
+• **Campus Resources (/student/resources)**: Browse seminar halls, computer labs, and smart classrooms to check availability.
+• **Profile (/student/profile)**: Manage your contact information and department details.
+
+🔒 *Access Scope: As a student, you only see your own submitted complaints and general campus resources. Administrative tools, user management, and campus-wide analytics are restricted.*`;
+    }
+
+    if (user?.role === 'staff') {
+      return `🔧 **Welcome to SmartCampus — Staff Operations Portal**
+
+SmartCampus is your operational workbench for managing maintenance tasks assigned directly to your department and technician queue.
+
+Here is an overview of the UI and features available to you:
+• **Staff Dashboard (/staff/dashboard)**: Your operational command center showing active task metrics (Pending, In Progress, Resolved) and urgent high-priority alerts.
+• **Assigned Issues (/staff/assigned-issues)**: Your personal task queue.
+  - Filter tasks by status and priority level.
+  - Inspect issue location, problem description, and student-uploaded photos.
+  - Change status to "In Progress" when starting work.
+  - Submit intermediate "Staff Updates" and final "Resolution Notes" when marking the issue "Resolved".
+• **Campus Resources (/staff/resources)**: View facility specifications, labs, and equipment details to coordinate maintenance.
+• **Staff Profile (/staff/profile)**: Update your technician contact number, service department, and account details.
+
+🔒 *Access Scope: Your view is strictly limited to tickets assigned to your queue. Campus-wide analytics, user creation, and ticket reassignment remain administrator privileges.*`;
+    }
+
+    if (user?.role === 'admin') {
+      return `🏛 **Welcome to SmartCampus — Administrator Control Center**
+
+SmartCampus gives you complete institutional oversight, automated dispatching, and data-grounded analytics across all campus facilities and departments.
+
+Here is an overview of the administrative UI and features at your command:
+• **Admin Dashboard & Analytics (/admin/dashboard)**:
+  - *Executive KPIs*: Real-time counters for Total Issues, Pending Backlog, In-Progress Work, and Resolution Rate %.
+  - *Visual Analytics*: Interactive breakdowns by department, category, and status.
+  - *AI Strategic Insights*: Automated data-grounded insights highlighting maintenance velocity and category concentrations.
+• **Issue Management (/admin/issues)**:
+  - Inspect all reported tickets campus-wide.
+  - Filter by department, category, priority, or unassigned status.
+  - Assign pending tickets directly to registered staff technicians and attach administrative notes.
+• **User Management (/admin/users)**:
+  - View all registered student and staff accounts.
+  - Create new student or staff user profiles.
+  - Toggle account status (Active / Inactive) and update user details.
+• **Resource Management (/admin/resources)**:
+  - Add, update, and manage campus facilities, seminar halls, computer labs, and equipment.
+• **Admin Profile (/admin/profile)**: Configure administrator details and system preferences.`;
+    }
+
+    return `🌐 **Welcome to SmartCampus**
+
+SmartCampus is a web-based facility management and campus operations platform that centralizes issue reporting, maintenance workflows, and resource allocation for college campuses.
+
+Here is how the platform works and what you can access:
+• **For Students (/login, /register)**: Report broken infrastructure (WiFi, power, plumbing, equipment) with AI category/priority detection, and track ticket resolution in real time under My Issues.
+• **For Staff Technicians (/login)**: Log in to your personal technician queue under Assigned Issues, update repair status, and submit official resolution notes.
+• **For Administrators (/admin/login)**: Sign in with administrative credentials and invite code (CampusAdmin123) to review campus-wide analytics, dispatch tickets to technicians, and manage users and campus resources.
+
+👉 *To get started, please log in with your account or click "Register" to create a student profile.*`;
+  }
+
+  // 3. Staff Technicians Roster for Administrator
+  if (dataContext?.type === 'admin_staff') {
+    const { totalStaff, staffMembers, unassignedTickets } = dataContext;
+
+    const staffList = staffMembers.length
+      ? staffMembers
+          .map(
+            (s, i) =>
+              `  ${i + 1}. **${s.name}** [${s.department || 'Maintenance'}] — Status: ${s.status || 'active'}${s.phone ? ` | Phone: ${s.phone}` : ''}`
+          )
+          .join('\n')
+      : '  (No staff technicians currently registered in the database)';
+
+    const ticketList = unassignedTickets.length
+      ? unassignedTickets
+          .map(
+            (t, i) =>
+              `  • "${t.title}" [${t.category}] at ${t.location || 'Campus'} — ${t.priority} Priority`
+          )
+          .join('\n')
+      : '  • No unassigned active tickets.';
+
+    return `👷 **Registered Staff Technicians from Campus Database:**
+• Total Staff Registered: ${totalStaff}
+
+Active Staff Technicians:
+${staffList}
+
+📋 Unassigned Active Tickets (${unassignedTickets.length} sample):
+${ticketList}
+
+💡 Dispatch Tip: To assign tickets to these technicians, open **Issue Management** from your Admin dashboard, select a pending ticket, and pick the technician from the "Assign Staff" dropdown.`;
+  }
+
+  // 4. Staff Assigned Tasks (Strictly scoped to that staff member's queue)
   if (dataContext?.type === 'staff_tasks') {
     const { total, filterDesc, totalAssigned, pendingCount, inProgressCount, resolvedCount, sampleIssues } = dataContext;
 
@@ -548,7 +750,7 @@ ${sampleList}
 💡 Next Step: When you begin work on a task, change its status to "In Progress" in the Assigned Issues dashboard, and submit resolution notes once finished.`;
   }
 
-  // 3. Student Reported Issues (Strictly scoped to that student's reported tickets)
+  // 5. Student Reported Issues (Strictly scoped to that student's reported tickets)
   if (dataContext?.type === 'student_issues') {
     const { total, filterDesc, totalReported, pendingCount, inProgressCount, resolvedCount, sampleIssues } = dataContext;
 
@@ -589,9 +791,9 @@ ${sampleList}
 💡 You can view full history and attach further details under the "My Issues" tab on your dashboard.`;
   }
 
-  // 4. Data-Grounded Analytics Report (Only for Administrators)
+  // 6. Data-Grounded Analytics Report (Only for Administrators)
   if (dataContext?.type === 'analytics') {
-    const { scopeLabel, total, pending, inProgress, resolved, highPriority, resolutionRate, sampleIssues } = dataContext;
+    const { scopeLabel, total, pending, inProgress, resolved, highPriority, resolutionRate, sampleIssues, activeStaffList } = dataContext;
 
     if (total === 0) {
       return `📊 Analysis for ${scopeLabel}:
@@ -609,11 +811,16 @@ No reported issues currently recorded under ${scopeLabel} in the campus database
         .join('\n')
       : '  • No recent tickets available.';
 
+    const staffNotice =
+      activeStaffList && activeStaffList.length
+        ? ` (Registered technicians available: ${activeStaffList.map((s) => s.name).join(', ')})`
+        : '';
+
     const recommendation =
       highPriority > 0
-        ? `⚠️ Urgent Action: Prioritize assigning the ${highPriority} high-priority ticket(s) to staff technicians immediately.`
+        ? `⚠️ Urgent Action: Prioritize assigning the ${highPriority} high-priority ticket(s) to staff technicians immediately.${staffNotice}`
         : pending > 0
-          ? `💡 Operational Suggestion: Review and assign the ${pending} pending ticket(s) to improve the current ${resolutionRate}% resolution rate.`
+          ? `💡 Operational Suggestion: Review and assign the ${pending} pending ticket(s) to improve the current ${resolutionRate}% resolution rate.${staffNotice}`
           : `✅ Optimal Performance: All tickets in ${scopeLabel} have been addressed or resolved.`;
 
     return `📊 Issue Analysis for ${scopeLabel}:
@@ -628,7 +835,7 @@ ${sampleList}
 ${recommendation}`;
   }
 
-  // 5. Resource Overview
+  // 7. Resource Overview
   if (dataContext?.type === 'resources') {
     return `🏛 Campus Resources Overview:
 ${dataContext.summary}
@@ -636,21 +843,21 @@ ${dataContext.summary}
 Visit the Resources tab in your dashboard to view complete availability schedules and book facilities.`;
   }
 
-  // 6. Role-tailored Greetings
+  // 8. Role-tailored Greetings
   if (/hello|hi\b|hey\b|good morning|good afternoon/.test(text)) {
     if (user?.role === 'admin') {
-      return `Hello Administrator ${user.name || ''}! How can I assist you today with campus analytics, ticket assignments, or issue management?`;
+      return `Hello Administrator ${user.name || ''}! How can I assist you today with campus analytics, ticket assignments, or issue management? Ask me about "registered staff", "analyse issues in ECE dept", or "what is this website".`;
     }
     if (user?.role === 'staff') {
-      return `Hello ${user.name || 'Staff Member'}! How can I assist you with your assigned maintenance tickets or department resources?`;
+      return `Hello ${user.name || 'Staff Member'}! How can I assist you with your assigned maintenance tickets or department resources? Ask me about "my pending tasks" or "what is this website".`;
     }
     if (user) {
-      return `Hello ${user.name || ''}! How can I help you with reporting an issue or checking campus resources?`;
+      return `Hello ${user.name || ''}! How can I help you with reporting an issue or checking campus resources? Ask me "what is this website" for a walkthrough of student features.`;
     }
     return 'Hello! Welcome to SmartCampus. I can guide you through reporting campus issues, tracking requests, using resources and navigating the student, staff or admin areas. What would you like help with?';
   }
 
-  // 7. Common platform actions
+  // 9. Common platform actions
   if (/report|raise|submit|new complaint|new issue/.test(text)) {
     return 'To report a campus issue, open Report Issue from your student dashboard. Provide a clear title, category, location, and description. You can also attach an image to help technicians locate and resolve the issue quickly.';
   }
@@ -680,10 +887,10 @@ Visit the Resources tab in your dashboard to view complete availability schedule
   }
 
   return user?.role === 'admin'
-    ? 'I can assist with admin workflows: reviewing department-specific issue analysis, managing campus issues, and assigning technicians. Ask me to "analyse issues in ECE dept" or "overview of pending issues".'
+    ? 'I can assist with admin workflows: reviewing department-specific issue analysis, managing campus issues, and assigning technicians. Ask me to "analyse issues in ECE dept", "list registered staff", or "what is this website".'
     : user?.role === 'staff'
-      ? 'I can assist with your assigned maintenance workload. Ask me "what issues are pending?", "my high priority tasks", or "campus resources".'
-      : 'I can assist with SmartCampus basics: reporting an issue, tracking ticket status, and checking campus resources. What do you need help with?';
+      ? 'I can assist with your assigned maintenance workload. Ask me "what issues are pending?", "my high priority tasks", or "what is this website".'
+      : 'I can assist with SmartCampus basics: reporting an issue, tracking ticket status, checking campus resources, or explaining the website features. What do you need help with?';
 };
 
 const askCampusAssistant = async (req, res) => {
@@ -795,8 +1002,8 @@ const askCampusAssistant = async (req, res) => {
                 },
                 contents,
                 generationConfig: {
-                  temperature: 0.3,
-                  maxOutputTokens: 600,
+                  temperature: 0.2,
+                  maxOutputTokens: 1000,
                 },
               }),
             }

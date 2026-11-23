@@ -451,8 +451,25 @@ function AdminIssueDetails({ issueId }) {
     }
   };
 
-  fetchData();
-}, [id]);
+    fetchData();
+  }, [id]);
+
+  // Auto-dismiss feedback notifications
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => {
+      setMessage("");
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [message]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => {
+      setError("");
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const handleUpdate = async (e) => {
     e.preventDefault();
@@ -827,6 +844,23 @@ function AdminUsers() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Auto-dismiss feedback notifications
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => {
+      setMessage("");
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [message]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => {
+      setError("");
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const resetForm = () => {
     setName("");
@@ -1351,6 +1385,7 @@ function AdminResources() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const fetchResources = async () => {
     try {
@@ -1383,7 +1418,24 @@ function AdminResources() {
     fetchResources();
   }, []);
 
-  const resetForm = () => {
+  // Auto-dismiss feedback notifications
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => {
+      setMessage("");
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [message]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => {
+      setError("");
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  const resetForm = (clearMsg = true) => {
     setName("");
     setCategory("Academic");
     setLocation("");
@@ -1391,6 +1443,7 @@ function AdminResources() {
     setDescription("");
     setEditingId(null);
     setShowForm(false);
+    if (clearMsg) setMessage("");
   };
 
   const handleSubmit = async (e) => {
@@ -1418,12 +1471,14 @@ function AdminResources() {
           editingId,
           resourceData
         );
+        setMessage("Resource updated successfully!");
       } else {
         await createResource(resourceData);
+        setMessage("Resource created successfully!");
       }
 
       await fetchResources();
-      resetForm();
+      resetForm(false);
 
     } catch (err) {
       setError(
@@ -1457,7 +1512,7 @@ function AdminResources() {
       setError("");
 
       await deleteResource(resourceId);
-
+      setMessage("Resource deleted successfully!");
       await fetchResources();
 
     } catch (err) {
@@ -1499,6 +1554,12 @@ function AdminResources() {
         {error && (
           <div className="error-message">
             ⚠ {error}
+          </div>
+        )}
+
+        {message && (
+          <div className="success-message">
+            ✓ {message}
           </div>
         )}
 
@@ -2272,6 +2333,23 @@ function AdminProfile() {
 
     fetchProfile();
   }, []);
+
+  // Auto-dismiss feedback notifications
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(() => {
+      setMessage("");
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [message]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => {
+      setError("");
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
