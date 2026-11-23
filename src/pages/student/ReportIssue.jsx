@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Sparkles, Check, RefreshCw } from "lucide-react";
 import DashboardLayout from "../../components/DashboardLayout";
-import { createIssue } from "../../services/api";
+import { createIssue, analyzeIssue } from "../../services/api";
 
 function ReportIssue() {
   const [formData, setFormData] = useState({
@@ -16,9 +17,63 @@ function ReportIssue() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiApplied, setAiApplied] = useState(false);
+
+  // Auto-dismiss feedback notifications
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => {
+      setSuccess("");
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [success]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => {
+      setError("");
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
+  const handleAiAnalyze = async () => {
+    const textToAnalyze = (formData.title + " " + formData.description).trim();
+    if (textToAnalyze.length < 5) {
+      setError("Please enter a title or description before running AI analysis.");
+      return;
+    }
+
+    try {
+      setIsAnalyzing(true);
+      setError("");
+      const result = await analyzeIssue({ description: textToAnalyze });
+      if (result) {
+        setAiAnalysis(result);
+        setAiApplied(false);
+      }
+    } catch (err) {
+      console.error("AI issue analysis failed:", err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleApplyAi = () => {
+    if (!aiAnalysis) return;
+    setFormData((prev) => ({
+      ...prev,
+      category: aiAnalysis.category || prev.category,
+      priority: aiAnalysis.priority || prev.priority,
+    }));
+    setAiApplied(true);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (success) setSuccess("");
+    if (error) setError("");
 
     setFormData({
       ...formData,
@@ -27,6 +82,9 @@ function ReportIssue() {
   };
 
   const handleImageChange = (e) => {
+    if (success) setSuccess("");
+    if (error) setError("");
+
     setFormData({
       ...formData,
       image: e.target.files[0] || null
@@ -83,6 +141,8 @@ function ReportIssue() {
       await createIssue(issueData);
 
       setSuccess("Issue submitted successfully!");
+      setAiAnalysis(null);
+      setAiApplied(false);
 
       setFormData({
         title: "",
@@ -382,25 +442,69 @@ function ReportIssue() {
 
         {/* AI Preview */}
         <div className="ai-preview">
-
-          <h2>🤖 AI Issue Analysis</h2>
-
-          <p>
-            Our AI assistant will analyse your issue and
-            suggest its category and priority.
-          </p>
-
-          <div className="ai-placeholder">
-
-            <span>✨</span>
-
-            <p>
-              AI analysis will appear here after
-              submitting your issue.
-            </p>
-
+          <div className="ai-preview-header">
+            <span className="ai-badge"><Sparkles size={13} /> AI ASSISTANT</span>
+            <h2>Smart Issue Analysis</h2>
           </div>
 
+          <p>
+            Our campus AI analyzes your issue text to predict the proper category, priority level, and dispatch route.
+          </p>
+
+          {isAnalyzing ? (
+            <div className="ai-placeholder is-analyzing">
+              <span className="ai-spin"><RefreshCw size={24} /></span>
+              <p>Analyzing issue details...</p>
+            </div>
+          ) : aiAnalysis ? (
+            <div className="ai-analysis-card">
+              <div className="ai-analysis-row">
+                <span className="ai-label">Suggested Category</span>
+                <strong className="ai-tag">{aiAnalysis.category}</strong>
+              </div>
+
+              <div className="ai-analysis-row">
+                <span className="ai-label">Recommended Priority</span>
+                <strong className={`ai-priority-badge priority-${(aiAnalysis.priority || "medium").toLowerCase()}`}>
+                  {aiAnalysis.priority}
+                </strong>
+              </div>
+
+              {aiAnalysis.reason && (
+                <div className="ai-reason-box">
+                  <small>Assessment Reason:</small>
+                  <p>{aiAnalysis.reason}</p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className={`ai-apply-btn ${aiApplied ? "applied" : ""}`}
+                onClick={handleApplyAi}
+                disabled={aiApplied}
+              >
+                {aiApplied ? <><Check size={15} /> Applied to Form</> : <><Sparkles size={15} /> Apply to Form</>}
+              </button>
+            </div>
+          ) : (
+            <div className="ai-placeholder">
+              <span className="ai-spark-icon"><Sparkles size={26} /></span>
+              <p>
+                {formData.title || formData.description
+                  ? "Ready to analyze your issue description."
+                  : "Type your issue title or description to analyze category and priority."}
+              </p>
+              {(formData.title.trim().length > 2 || formData.description.trim().length > 3) && (
+                <button
+                  type="button"
+                  className="ai-trigger-btn"
+                  onClick={handleAiAnalyze}
+                >
+                  <Sparkles size={14} /> Analyze with AI
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
       </div>

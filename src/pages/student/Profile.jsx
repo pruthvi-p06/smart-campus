@@ -49,6 +49,23 @@ function Profile() {
     fetchProfile();
   }, []);
 
+  // Auto-dismiss feedback notifications
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => {
+      setSuccess("");
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [success]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => {
+      setError("");
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -57,7 +74,8 @@ function Profile() {
       [name]: value
     }));
 
-    setSuccess("");
+    if (success) setSuccess("");
+    if (error) setError("");
   };
 
   const handleSubmit = async (e) => {

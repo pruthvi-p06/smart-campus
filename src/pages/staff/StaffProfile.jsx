@@ -44,6 +44,23 @@ function StaffProfile() {
     fetchProfile();
   }, []);
 
+  // Auto-dismiss feedback notifications
+  useEffect(() => {
+    if (!successMessage) return;
+    const timer = setTimeout(() => {
+      setSuccessMessage("");
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => {
+      setError("");
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
